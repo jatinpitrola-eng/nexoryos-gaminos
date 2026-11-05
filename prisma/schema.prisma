@@ -1,0 +1,219 @@
+// GAMINOS — Gaming Zone Operating System
+// Prisma schema (SQLite). Note: SQLite does not support Prisma enums,
+// so enum-like fields are stored as String and typed via TS unions in src/lib/types.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Auth ----------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  role         String   @default("STAFF") // OWNER | STAFF
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ---------- Zone settings (key-value) ----------
+
+model Setting {
+  key   String @id
+  value String
+}
+
+// ---------- Floor ----------
+
+model Station {
+  id         String  @id @default(cuid())
+  name       String  @unique
+  type       String // PS5 | XBOX | PC | VR | SNOOKER | RACING
+  status     String  @default("FREE") // FREE | BUSY | MAINTENANCE
+  hourlyRate Float   @default(100)
+  isActive   Boolean @default(true)
+
+  sessions    Session[]
+  bookings    Booking[]
+  maintenance MaintenanceLog[]
+}
+
+model PricingRule {
+  id          String  @id @default(cuid())
+  stationType String // PS5 | XBOX | PC | VR | SNOOKER | RACING
+  name        String
+  ratePerHour Float
+  daysMask    Int     @default(127) // bit 0 = Sunday ... bit 6 = Saturday
+  startHour   Int // inclusive, 0-23
+  endHour     Int // exclusive, 1-24
+  kind        String // PEAK | OFFPEAK | HAPPYHOUR | STUDENT
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------- Customers / Wallet / Membership ----------
+
+model Customer {
+  id            String   @id @default(cuid())
+  name          String
+  phone         String   @unique
+  email         String?
+  walletBalance Float    @default(0)
+  loyaltyPoints Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  memberships  Membership[]
+  walletTxns   WalletTxn[]
+  sessions     Session[]
+  bookings     Booking[]
+}
+
+model Membership {
+  id           String   @id @default(cuid())
+  customerId   String
+  planName     String
+  price        Float
+  bonusMinutes Int      @default(0)
+  startsAt     DateTime
+  expiresAt    DateTime
+  isActive     Boolean  @default(true)
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model WalletTxn {
+  id         String   @id @default(cuid())
+  customerId String
+  amount     Float // positive = credit, negative = debit
+  type       String // RECHARGE | SPEND | BONUS | REFUND
+  note       String?
+  createdAt  DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+}
+
+// ---------- Sessions / Bookings ----------
+
+model Session {
+  id            String    @id @default(cuid())
+  stationId     String
+  customerId    String?
+  bookingId     String? @unique
+  startedAt     DateTime
+  endedAt       DateTime?
+  plannedMinutes Int?
+  rateSnapshot  Float // hourly rate applied at start
+  stationFee    Float     @default(0)
+  fnbTotal      Float     @default(0)
+  discount      Float     @default(0)
+  total         Float     @default(0)
+  status        String    @default("ACTIVE") // ACTIVE | COMPLETED | CANCELLED
+
+  station  Station   @relation(fields: [stationId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+  booking  Booking?  @relation(fields: [bookingId], references: [id])
+
+  fnbOrders FnBOrder[]
+  payments  Payment[]
+
+  createdAt DateTime @default(now())
+}
+
+model Booking {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  stationId     String
+  customerId    String
+  slotStart     DateTime
+  slotEnd       DateTime
+  depositAmount Float    @default(0)
+  depositPaid   Boolean  @default(false)
+  status        String   @default("BOOKED") // BOOKED | CHECKEDIN | NOSHOW | CANCELLED | COMPLETED
+  source        String   @default("PHONE") // WALKIN | PHONE | ONLINE
+
+  station  Station  @relation(fields: [stationId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  session Session?
+
+  createdAt DateTime @default(now())
+}
+
+// ---------- F&B ----------
+
+model FnBItem {
+  id            String  @id @default(cuid())
+  name          String  @unique
+  category      String // BEVERAGES | SNACKS | MEALS | ENERGY | OTHER
+  price         Float
+  stock         Int     @default(0)
+  lowStockAlert Int     @default(5)
+  isActive      Boolean @default(true)
+}
+
+model FnBOrder {
+  id        String   @id @default(cuid())
+  sessionId String?
+  items     String // JSON string: [{itemId, name, price, qty}]
+  total     Float
+  status    String   @default("OPEN") // OPEN | PAID
+  createdAt DateTime @default(now())
+
+  session Session? @relation(fields: [sessionId], references: [id])
+}
+
+// ---------- Payments / Shifts / Ops ----------
+
+model Payment {
+  id        String   @id @default(cuid())
+  sessionId String
+  amount    Float
+  method    String // UPI | CASH | CARD
+  createdAt DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id])
+}
+
+model Shift {
+  id          String    @id @default(cuid())
+  staffName   String
+  openedAt    DateTime
+  closedAt    DateTime?
+  openingCash Float     @default(0)
+  closingCash Float?
+  systemTotal Float?
+  note        String?
+}
+
+model MaintenanceLog {
+  id         String    @id @default(cuid())
+  stationId  String
+  issue      String
+  cost       Float     @default(0)
+  resolvedAt DateTime?
+
+  station Station @relation(fields: [stationId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Expense {
+  id       String   @id @default(cuid())
+  title    String
+  category String // RENT | SALARY | ELECTRICITY | INTERNET | OTHER
+  amount   Float
+  date     DateTime
+
+  createdAt DateTime @default(now())
+}
