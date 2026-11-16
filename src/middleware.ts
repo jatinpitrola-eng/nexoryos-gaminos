@@ -13,8 +13,10 @@ const PROTECTED = [
   "/billing",
   "/reports",
   "/settings",
+  "/tournaments",
+  "/expenses",
 ];
-const OWNER_ONLY = ["/reports", "/pricing", "/settings"];
+const OWNER_ONLY = ["/reports", "/pricing", "/settings", "/expenses"];
 const AUTH_PAGES = ["/login", "/signup"];
 const SECRET = process.env.NEXTAUTH_SECRET || "gaminos-nexoryos-secret-2025-xyz";
 

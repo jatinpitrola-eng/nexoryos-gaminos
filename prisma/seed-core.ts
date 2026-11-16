@@ -298,6 +298,35 @@ export async function runSeed(): Promise<{ stations: number; customers: number }
     });
   }
 
+  // ---------- Tournament (esports) ----------
+  const tourn = await db.tournament.upsert({
+    where: { id: "seed-tournament-1" },
+    update: { startsAt: at(3, 18) },
+    create: {
+      id: "seed-tournament-1",
+      name: "Valorant City Clash — Rajkot",
+      game: "Valorant",
+      stationType: "PC",
+      startsAt: at(3, 18),
+      entryFee: 100,
+      prizePool: 3000,
+      maxPlayers: 16,
+      status: "UPCOMING",
+      notes: "5v5 double elim. Winner takes ₹2,000 + 20 free hours.",
+    },
+  });
+  const existingEntries = await db.tournamentEntry.count({ where: { tournamentId: tourn.id } });
+  if (existingEntries === 0) {
+    await db.tournamentEntry.createMany({
+      data: [
+        { tournamentId: tourn.id, name: "Rahul Bhai", phone: "9876543210", feePaid: true },
+        { tournamentId: tourn.id, name: "Jay Vanani", phone: "9812345670", feePaid: true },
+        { tournamentId: tourn.id, name: "Dev Bhatia", phone: "9900112233", feePaid: false },
+        { tournamentId: tourn.id, name: "Karan Lakhani", phone: "9765432109", feePaid: true },
+      ],
+    });
+  }
+
   const [stationCount, customerCount] = await Promise.all([db.station.count(), db.customer.count()]);
   return { stations: stationCount, customers: customerCount };
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireSession, badRequest, serverError } from "@/lib/guards";
-import { computeStationFee } from "@/lib/money";
+import { computeStationFeeWithPause } from "@/lib/money";
 
 export const runtime = "nodejs";
 
@@ -24,7 +24,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (!session) return badRequest("Session not found");
 
     const now = new Date();
-    const { minutes, fee } = computeStationFee(session.rateSnapshot, session.startedAt, session.endedAt ?? now);
+    const pausedTotal =
+      session.pausedMinutes +
+      (session.status === "PAUSED" && session.pausedAt
+        ? Math.max(0, Math.round((now.getTime() - session.pausedAt.getTime()) / 60000))
+        : 0);
+    const { minutes, fee } = computeStationFeeWithPause(session.rateSnapshot, session.startedAt, session.endedAt ?? now, pausedTotal);
 
     return NextResponse.json({
       session: {

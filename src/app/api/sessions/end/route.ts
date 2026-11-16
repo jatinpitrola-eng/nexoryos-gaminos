@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireSession, badRequest, serverError } from "@/lib/guards";
-import { computeStationFee, loyaltyPointsFor, formatINR } from "@/lib/money";
+import { computeStationFeeWithPause, loyaltyPointsFor, formatINR } from "@/lib/money";
 
 export const runtime = "nodejs";
 
@@ -34,10 +34,15 @@ export async function POST(req: Request) {
       },
     });
     if (!session) return badRequest("Session not found");
-    if (session.status !== "ACTIVE") return badRequest("Session already ended");
+    if (session.status !== "ACTIVE" && session.status !== "PAUSED") return badRequest("Session already ended");
 
     const endedAt = new Date();
-    const { minutes, fee } = computeStationFee(session.rateSnapshot, session.startedAt, endedAt);
+    const pausedTotal =
+      session.pausedMinutes +
+      (session.status === "PAUSED" && session.pausedAt
+        ? Math.max(0, Math.round((endedAt.getTime() - session.pausedAt.getTime()) / 60000))
+        : 0);
+    const { minutes, fee } = computeStationFeeWithPause(session.rateSnapshot, session.startedAt, endedAt, pausedTotal);
     const fnbTotal = session.fnbOrders.reduce((s, o) => s + o.total, 0);
     const maxDiscount = fee + fnbTotal;
     const safeDiscount = Math.min(discount, maxDiscount);

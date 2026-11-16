@@ -52,6 +52,27 @@ const TXN_STYLE: Record<string, string> = {
   REFUND: "border-amber-500/40 text-amber-300",
 };
 
+// Membership tier presets — mirror /api/membership server-side presets.
+const TIER_PRESETS: Record<string, { planName: string; price: number; bonusMinutes: number }> = {
+  SILVER: { planName: "Silver Membership", price: 299, bonusMinutes: 0 },
+  GOLD: { planName: "Gold Membership", price: 599, bonusMinutes: 60 },
+  PLATINUM: { planName: "Platinum Membership", price: 999, bonusMinutes: 180 },
+};
+
+const TIER_BADGE: Record<string, string> = {
+  SILVER: "border-slate-400/40 bg-slate-400/10 text-slate-300",
+  GOLD: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+  PLATINUM: "border-cyan-400/50 bg-cyan-400/10 text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.35)]",
+};
+
+function tierOf(planName: string): string | null {
+  const p = planName.toLowerCase();
+  if (p.includes("platinum")) return "PLATINUM";
+  if (p.includes("gold")) return "GOLD";
+  if (p.includes("silver")) return "SILVER";
+  return null;
+}
+
 export default function MembersPage() {
   const [q, setQ] = React.useState("");
   const [customers, setCustomers] = React.useState<CustomerLite[] | null>(null);
@@ -274,14 +295,20 @@ function MemberDrawer({ id, onClose, onChanged }: { id: string | null; onClose: 
                 <div className="space-y-2">
                   {detail.memberships.map((m) => {
                     const expired = new Date(m.expiresAt).getTime() < Date.now();
+                    const t = tierOf(m.planName);
                     return (
                       <div key={m.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium">{m.planName}</span>
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="truncate font-medium">{m.planName}</span>
+                            {t ? (
+                              <Badge variant="outline" className={"shrink-0 text-[10px] " + (TIER_BADGE[t] ?? "")}>{t}</Badge>
+                            ) : null}
+                          </span>
                           {expired || !m.isActive ? (
-                            <Badge variant="outline" className="border-red-500/40 text-red-300">Expired</Badge>
+                            <Badge variant="outline" className="shrink-0 border-red-500/40 text-red-300">Expired</Badge>
                           ) : (
-                            <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">Active</Badge>
+                            <Badge variant="outline" className="shrink-0 border-emerald-500/40 text-emerald-300">Active</Badge>
                           )}
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -446,6 +473,7 @@ function RechargeDialog({ id, open, onClose, onDone }: { id: string | null; open
 }
 
 function MembershipDialog({ id, open, onClose, onDone }: { id: string | null; open: boolean; onClose: () => void; onDone: () => void }) {
+  const [tier, setTier] = React.useState("CUSTOM");
   const [planName, setPlanName] = React.useState("");
   const [price, setPrice] = React.useState("");
   const [bonus, setBonus] = React.useState("");
@@ -454,6 +482,7 @@ function MembershipDialog({ id, open, onClose, onDone }: { id: string | null; op
 
   React.useEffect(() => {
     if (open) {
+      setTier("CUSTOM");
       setPlanName("");
       setPrice("");
       setBonus("");
@@ -461,13 +490,31 @@ function MembershipDialog({ id, open, onClose, onDone }: { id: string | null; op
     }
   }, [open]);
 
+  function applyTier(v: string) {
+    setTier(v);
+    const preset = TIER_PRESETS[v];
+    if (preset) {
+      // Auto-fill from preset — fields stay editable.
+      setPlanName(preset.planName);
+      setPrice(String(preset.price));
+      setBonus(String(preset.bonusMinutes));
+    }
+  }
+
   async function submit() {
     setBusy(true);
     try {
       const res = await fetch("/api/membership", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId: id, planName, price: Number(price), bonusMinutes: Number(bonus) || 0, months: Number(months) }),
+        body: JSON.stringify({
+          customerId: id,
+          tier: tier === "CUSTOM" ? undefined : tier,
+          planName,
+          price: Number(price),
+          bonusMinutes: Number(bonus) || 0,
+          months: Number(months),
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || "Could not attach membership");
@@ -488,6 +535,18 @@ function MembershipDialog({ id, open, onClose, onDone }: { id: string | null; op
           <DialogDescription>Starts today, expires after the selected months.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Tier preset</Label>
+            <Select value={tier} onValueChange={applyTier}>
+              <SelectTrigger className="border-violet-500/25 bg-white/5"><SelectValue /></SelectTrigger>
+              <SelectContent className="border-violet-500/25 bg-[#0f1526]">
+                {Object.keys(TIER_PRESETS).map((t) => (
+                  <SelectItem key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</SelectItem>
+                ))}
+                <SelectItem value="CUSTOM">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="mb-name">Plan name</Label>
             <Input id="mb-name" value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="Gamer Pro — 90 Days" className="border-violet-500/25 bg-white/5" />

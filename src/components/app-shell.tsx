@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   SlidersHorizontal,
   Timer,
+  Trophy,
   Users,
   X,
 } from "lucide-react";
@@ -39,8 +40,10 @@ const NAV: NavItem[] = [
   { href: "/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/pos", label: "F&B POS", icon: ShoppingCart },
   { href: "/members", label: "Members", icon: Users },
+  { href: "/tournaments", label: "Tournaments", icon: Trophy },
   { href: "/shifts", label: "Shifts", icon: Timer },
   { href: "/billing", label: "Billing", icon: ReceiptText },
+  { href: "/expenses", label: "Expenses", icon: IndianRupee, ownerOnly: true },
   { href: "/pricing", label: "Pricing", icon: SlidersHorizontal, ownerOnly: true },
   { href: "/reports", label: "Reports", icon: BarChart3, ownerOnly: true },
   { href: "/settings", label: "Settings", icon: Settings, ownerOnly: true },
@@ -106,7 +109,7 @@ export function AppShell({
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-violet-500/15 bg-[#0c1122]/80 backdrop-blur-xl lg:flex">
         <div className="flex h-16 items-center border-b border-white/5 px-5">
-          <Link href="/dashboard" aria-label="GAMINOS dashboard">
+          <Link href="/dashboard" aria-label="NexoryOS dashboard">
             <Brand size="sm" withByline={false} />
           </Link>
           <span className="ml-2 text-[10px] uppercase tracking-widest text-muted-foreground">by Nexoryos</span>
@@ -136,7 +139,7 @@ export function AppShell({
 
       {/* Mobile top bar */}
       <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-violet-500/15 bg-[#0a0e1a]/85 px-4 backdrop-blur-xl lg:hidden">
-        <Link href="/dashboard" aria-label="GAMINOS dashboard">
+        <Link href="/dashboard" aria-label="NexoryOS dashboard">
           <Brand size="sm" withByline={false} />
         </Link>
         <Sheet open={open} onOpenChange={setOpen}>
@@ -172,7 +175,7 @@ export function AppShell({
         <footer className="mt-auto border-t border-violet-500/15 bg-[#0c1122]/60 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 sm:flex-row">
             <p className="text-xs text-muted-foreground">
-              © {new Date().getFullYear()} GAMINOS — every session billed, every hour filled.
+              © {new Date().getFullYear()} NexoryOS GameZone OS — every session billed, every hour filled.
             </p>
             <NexoryosBadge />
           </div>

@@ -43,6 +43,7 @@ export async function GET(req: Request) {
         depositPaid: b.depositPaid,
         status: b.status,
         source: b.source,
+        notify: b.notify,
       })),
     });
   } catch (e) {

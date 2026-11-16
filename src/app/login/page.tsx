@@ -32,7 +32,7 @@ function LoginForm() {
       setError("Invalid email or password. Please try again.");
       return;
     }
-    toast.success("Welcome back to GAMINOS!");
+    toast.success("Welcome back to NEXORYOS GameZone OS!");
     router.push(callbackUrl);
     router.refresh();
   }

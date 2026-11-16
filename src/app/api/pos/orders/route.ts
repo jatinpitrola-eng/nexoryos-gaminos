@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     if (sessionId) {
       const session = await db.session.findUnique({ where: { id: sessionId } });
       if (!session) return badRequest("Session not found");
-      if (session.status !== "ACTIVE") return badRequest("That session has ended — sell standalone instead");
+      if (session.status !== "ACTIVE" && session.status !== "PAUSED") return badRequest("That session has ended — sell standalone instead");
     }
 
     const total = lineItems.reduce((sum, li) => {

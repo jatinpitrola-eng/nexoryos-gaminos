@@ -51,7 +51,7 @@ export default function SignupPage() {
         router.push("/login");
         return;
       }
-      toast.success("Welcome to GAMINOS, owner!");
+      toast.success("Welcome to NEXORYOS GameZone OS, owner!");
       router.push("/dashboard");
       router.refresh();
     } catch {

@@ -1,15 +1,21 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
+import QRCode from "qrcode";
 import {
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Copy,
+  ExternalLink,
   Loader2,
   MessageCircle,
   Plus,
+  QrCode,
   UserX,
   XCircle,
 } from "lucide-react";
@@ -53,6 +59,7 @@ interface Booking {
   depositPaid: boolean;
   status: string;
   source: string;
+  notify: boolean;
 }
 
 interface StationLite {
@@ -75,6 +82,7 @@ export default function BookingsPage() {
   const [stations, setStations] = React.useState<StationLite[]>([]);
   const [createFor, setCreateFor] = React.useState<{ station?: StationLite; hour?: number } | null>(null);
   const [actionBusy, setActionBusy] = React.useState<string | null>(null);
+  const [zoneName, setZoneName] = React.useState("");
 
   const load = React.useCallback(async () => {
     try {
@@ -97,6 +105,13 @@ export default function BookingsPage() {
     fetch("/api/stations", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { stations: [] }))
       .then((j) => setStations(j.stations ?? []))
+      .catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    fetch("/api/settings", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setZoneName(j?.settings?.zoneName ?? ""))
       .catch(() => {});
   }, []);
 
@@ -152,6 +167,10 @@ export default function BookingsPage() {
     ].join("\n");
   }
 
+  function whatsappConfirmText(b: Booking): string {
+    return `Hi ${b.customerName}! Your booking ${b.code} at ${zoneName || "our gaming zone"} is confirmed — ${b.stationName} on ${fmtDate(b.slotStart)} ${fmtTime(b.slotStart)}–${fmtTime(b.slotEnd)}. See you!`;
+  }
+
   function copy(text: string, label: string) {
     navigator.clipboard
       .writeText(text)
@@ -189,6 +208,8 @@ export default function BookingsPage() {
         </div>
       </header>
 
+      <BookingLinkCard />
+
       {/* Upcoming today */}
       <section aria-label="Upcoming bookings" className="space-y-3">
         <h2 className="font-display text-base font-semibold tracking-wide">UPCOMING {isToday ? "TODAY" : fmtDate(date).toUpperCase()}</h2>
@@ -218,7 +239,12 @@ export default function BookingsPage() {
                         <span className="text-xs text-muted-foreground">{b.customerPhone}</span>
                       </p>
                       <p className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline" className="border-white/15 text-[10px]">{b.source}</Badge>
+                        {b.source === "ONLINE" ? (
+                          <Badge className="border-cyan-400/40 bg-cyan-400/10 text-[10px] text-cyan-300">ONLINE</Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-white/15 text-[10px]">{b.source}</Badge>
+                        )}
+                        {b.notify && <Badge className="border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-300">NOTIFY</Badge>}
                         <span>
                           Deposit {formatINR(b.depositAmount)}{" "}
                           {b.depositPaid ? (
@@ -249,6 +275,17 @@ export default function BookingsPage() {
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2 border-t border-white/5 pt-3">
+                    {b.notify && b.customerPhone && (
+                      <a
+                        href={`https://wa.me/91${b.customerPhone}?text=${encodeURIComponent(whatsappConfirmText(b))}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex h-9 items-center rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 text-sm font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20"
+                        aria-label={`Send WhatsApp confirmation to ${b.customerName}`}
+                      >
+                        <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Confirm on WhatsApp
+                      </a>
+                    )}
                     <Button size="sm" variant="outline" className="h-9 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
                       onClick={() => bookingAction(b, "CHECKIN")} disabled={actionBusy === b.id}>
                       {actionBusy === b.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
@@ -611,5 +648,80 @@ function CreateBookingDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function BookingLinkCard() {
+  const [url, setUrl] = React.useState("");
+  const [qr, setQr] = React.useState("");
+  const [showQr, setShowQr] = React.useState(false);
+
+  React.useEffect(() => {
+    const u = `${window.location.origin}/book`;
+    setUrl(u);
+    QRCode.toDataURL(u, { width: 128, margin: 1, color: { dark: "#0a0e1a", light: "#ffffff" } })
+      .then(setQr)
+      .catch(() => {});
+  }, []);
+
+  function copyLink() {
+    if (!url) return;
+    navigator.clipboard
+      .writeText(url)
+      .then(() => toast.success("Booking link copied"))
+      .catch(() => toast.error("Copy failed"));
+  }
+
+  return (
+    <GlassCard variant="cyan" className="p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          {qr ? (
+            <span className="hidden rounded-lg bg-white p-1.5 sm:block">
+              <Image src={qr} alt="Booking page QR code" width={56} height={56} className="h-14 w-14" unoptimized />
+            </span>
+          ) : (
+            <QrCode className="hidden h-8 w-8 text-cyan-300 sm:block" aria-hidden />
+          )}
+          <div className="min-w-0">
+            <p className="font-display text-sm font-semibold tracking-wide">PUBLIC BOOKING LINK</p>
+            <p className="truncate text-xs text-muted-foreground">{url || "/book"}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="h-9 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10" onClick={copyLink}>
+            <Copy className="mr-1.5 h-3.5 w-3.5" /> Copy
+          </Button>
+          <a href={url || "/book"} target="_blank" rel="noreferrer" aria-label="Open public booking page">
+            <Button size="sm" variant="outline" className="h-9 border-violet-500/40 text-violet-300 hover:bg-violet-500/10">
+              <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open
+            </Button>
+          </a>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-9 w-9 sm:hidden"
+            onClick={() => setShowQr(!showQr)}
+            aria-label={showQr ? "Hide QR code" : "Show QR code"}
+            aria-expanded={showQr}
+          >
+            {showQr ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+      {showQr && (
+        <div className="mt-3 flex items-center gap-3 border-t border-white/5 pt-3 sm:hidden">
+          {qr && (
+            <span className="rounded-lg bg-white p-1.5">
+              <Image src={qr} alt="Booking page QR code" width={112} height={112} className="h-28 w-28" unoptimized />
+            </span>
+          )}
+          <p className="text-xs text-muted-foreground">Scan to open the public booking page — customers book without login.</p>
+        </div>
+      )}
+      <p className="mt-2 hidden text-xs text-muted-foreground sm:block">
+        Share this link — customers book their own slots and land here with the ONLINE tag + WhatsApp confirm.
+      </p>
+    </GlassCard>
   );
 }

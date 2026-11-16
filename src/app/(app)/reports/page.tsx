@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Coffee, Download, Gamepad2, IndianRupee, Users } from "lucide-react";
+import { Coffee, Download, Gamepad2, IndianRupee, Receipt, TrendingUp, Users } from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -51,6 +51,8 @@ interface ReportPayload {
   stationStats: StationStat[];
   heatmap: { days: { date: string; label: string }[]; hours: number[]; cells: number[][] };
   split: { gaming: number; fnb: number; memberships: number; total: number };
+  expensesTotal: number;
+  netProfit: number;
 }
 
 export default function ReportsPage() {
@@ -136,18 +138,26 @@ export default function ReportsPage() {
         ) : (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl bg-white/5" />)}
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl bg-white/5" />)}
             </div>
             <Skeleton className="h-64 rounded-2xl bg-white/5" />
           </div>
         )
       ) : (
         <>
-          <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
             <StatCard title="Gaming Revenue" value={formatINR(data.split.gaming)} icon={Gamepad2} accent="purple" sub="Session fees" />
             <StatCard title="F&B Revenue" value={formatINR(data.split.fnb)} icon={Coffee} accent="amber" sub="Counter + orders" />
             <StatCard title="Memberships" value={formatINR(data.split.memberships)} icon={Users} accent="cyan" sub="Plans sold" />
             <StatCard title="Total" value={formatINR(data.split.total)} icon={IndianRupee} accent="green" sub={`${fmtDate(data.from)} → ${fmtDate(data.to)}`} />
+            <StatCard title="Expenses" value={formatINR(data.expensesTotal)} icon={Receipt} accent="amber" sub="Kharcha this period" />
+            <StatCard
+              title="Net Profit"
+              value={`${data.netProfit < 0 ? "−" : ""}${formatINR(Math.abs(data.netProfit))}`}
+              icon={TrendingUp}
+              accent={data.netProfit >= 0 ? "green" : "red"}
+              sub="Revenue − expenses"
+            />
           </section>
 
           {/* Revenue chart */}

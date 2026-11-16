@@ -1,0 +1,616 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import * as React from "react";
+     4→     4→import {
+     5→     5→  CalendarDays,
+     6→     6→  CheckCircle2,
+     7→     7→  ChevronLeft,
+     8→     8→  ChevronRight,
+     9→     9→  Copy,
+    10→    10→  Loader2,
+    11→    11→  MessageCircle,
+    12→    12→  Plus,
+    13→    13→  UserX,
+    14→    14→  XCircle,
+    15→    15→} from "lucide-react";
+    16→    16→import { toast } from "sonner";
+    17→    17→import { GlassCard } from "@/components/glass-card";
+    18→    18→import { StatusDot } from "@/components/status-dot";
+    19→    19→import { Button } from "@/components/ui/button";
+    20→    20→import { Input } from "@/components/ui/input";
+    21→    21→import { Label } from "@/components/ui/label";
+    22→    22→import { Badge } from "@/components/ui/badge";
+    23→    23→import { Switch } from "@/components/ui/switch";
+    24→    24→import { Skeleton } from "@/components/ui/skeleton";
+    25→    25→import {
+    26→    26→  Dialog,
+    27→    27→  DialogContent,
+    28→    28→  DialogDescription,
+    29→    29→  DialogHeader,
+    30→    30→  DialogTitle,
+    31→    31→} from "@/components/ui/dialog";
+    32→    32→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+    33→    33→import { TYPE_STYLES } from "@/lib/ui-meta";
+    34→    34→import { fmtDate, fmtTime, hourLabel, isSameDay, minutesOverlap, startOfDay } from "@/lib/hours";
+    35→    35→import { formatINR } from "@/lib/money";
+    36→    36→
+    37→    37→const OPEN_HOUR = 10;
+    38→    38→const CLOSE_HOUR = 22;
+    39→    39→const HOURS = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR + i);
+    40→    40→
+    41→    41→interface Booking {
+    42→    42→  id: string;
+    43→    43→  code: string;
+    44→    44→  stationId: string;
+    45→    45→  stationName: string;
+    46→    46→  stationType: string;
+    47→    47→  customerId: string;
+    48→    48→  customerName: string;
+    49→    49→  customerPhone: string;
+    50→    50→  slotStart: string;
+    51→    51→  slotEnd: string;
+    52→    52→  depositAmount: number;
+    53→    53→  depositPaid: boolean;
+    54→    54→  status: string;
+    55→    55→  source: string;
+    56→    56→}
+    57→    57→
+    58→    58→interface StationLite {
+    59→    59→  id: string;
+    60→    60→  name: string;
+    61→    61→  type: string;
+    62→    62→  status: string;
+    63→    63→  hourlyRate: number;
+    64→    64→}
+    65→    65→
+    66→    66→interface CustomerLite {
+    67→    67→  id: string;
+    68→    68→  name: string;
+    69→    69→  phone: string;
+    70→    70→}
+    71→    71→
+    72→    72→export default function BookingsPage() {
+    73→    73→  const [date, setDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+    74→    74→  const [bookings, setBookings] = React.useState<Booking[] | null>(null);
+    75→    75→  const [stations, setStations] = React.useState<StationLite[]>([]);
+    76→    76→  const [createFor, setCreateFor] = React.useState<{ station?: StationLite; hour?: number } | null>(null);
+    77→    77→  const [actionBusy, setActionBusy] = React.useState<string | null>(null);
+    78→    78→
+    79→    79→  const load = React.useCallback(async () => {
+    80→    80→    try {
+    81→    81→      const res = await fetch(`/api/bookings?date=${date}`, { cache: "no-store" });
+    82→    82→      if (!res.ok) throw new Error();
+    83→    83→      const json = await res.json();
+    84→    84→      setBookings(json.bookings);
+    85→    85→    } catch {
+    86→    86→      toast.error("Could not load bookings");
+    87→    87→    }
+    88→    88→  }, [date]);
+    89→    89→
+    90→    90→  React.useEffect(() => {
+    91→    91→    load();
+    92→    92→    const t = setInterval(load, 30000);
+    93→    93→    return () => clearInterval(t);
+    94→    94→  }, [load]);
+    95→    95→
+    96→    96→  React.useEffect(() => {
+    97→    97→    fetch("/api/stations", { cache: "no-store" })
+    98→    98→      .then((r) => (r.ok ? r.json() : { stations: [] }))
+    99→    99→      .then((j) => setStations(j.stations ?? []))
+   100→   100→      .catch(() => {});
+   101→   101→  }, []);
+   102→   102→
+   103→   103→  const dayStart = React.useMemo(() => startOfDay(new Date(date + "T00:00:00")), [date]);
+   104→   104→  const now = new Date();
+   105→   105→  const isToday = isSameDay(dayStart, now);
+   106→   106→
+   107→   107→  const upcoming = React.useMemo(
+   108→   108→    () =>
+   109→   109→      (bookings ?? [])
+   110→   110→        .filter((b) => b.status === "BOOKED")
+   111→   111→        .sort((a, b) => a.slotStart.localeCompare(b.slotStart)),
+   112→   112→    [bookings]
+   113→   113→  );
+   114→   114→
+   115→   115→  function shiftDate(days: number) {
+   116→   116→    const d = new Date(date + "T00:00:00");
+   117→   117→    d.setDate(d.getDate() + days);
+   118→   118→    setDate(d.toISOString().slice(0, 10));
+   119→   119→  }
+   120→   120→
+   121→   121→  async function bookingAction(b: Booking, action: "CHECKIN" | "NOSHOW" | "CANCEL") {
+   122→   122→    if (action === "CANCEL" && !window.confirm(`Cancel booking ${b.code} for ${b.customerName}?`)) return;
+   123→   123→    setActionBusy(b.id);
+   124→   124→    try {
+   125→   125→      const res = await fetch(`/api/bookings/${b.id}`, {
+   126→   126→        method: "PATCH",
+   127→   127→        headers: { "Content-Type": "application/json" },
+   128→   128→        body: JSON.stringify({ action }),
+   129→   129→      });
+   130→   130→      const json = await res.json().catch(() => ({}));
+   131→   131→      if (!res.ok) throw new Error(json.error || "Action failed");
+   132→   132→      if (action === "CHECKIN")
+   133→   133→        toast.success(`${b.stationName} — session started for ${b.customerName}`);
+   134→   134→      else if (action === "NOSHOW") toast.success(`${b.code} marked no-show`);
+   135→   135→      else toast.success(`${b.code} cancelled`);
+   136→   136→      await load();
+   137→   137→    } catch (e) {
+   138→   138→      toast.error(e instanceof Error ? e.message : "Action failed");
+   139→   139→    } finally {
+   140→   140→      setActionBusy(null);
+   141→   141→    }
+   142→   142→  }
+   143→   143→
+   144→   144→  function reminderText(b: Booking): string {
+   145→   145→    return [
+   146→   146→      `Hi ${b.customerName}! 👋 Your slot at our gaming zone is confirmed:`,
+   147→   147→      `🎮 ${b.stationName} (${TYPE_STYLES[b.stationType as keyof typeof TYPE_STYLES]?.label ?? b.stationType})`,
+   148→   148→      `📅 ${fmtDate(b.slotStart)} · ${fmtTime(b.slotStart)} – ${fmtTime(b.slotEnd)}`,
+   149→   149→      `💰 Deposit: ${formatINR(b.depositAmount)} (${b.depositPaid ? "received" : "pending at counter"})`,
+   150→   150→      `🔑 Booking code: ${b.code}`,
+   151→   151→      `See you soon — reply CALL if you need to change your slot!`,
+   152→   152→    ].join("\n");
+   153→   153→  }
+   154→   154→
+   155→   155→  function copy(text: string, label: string) {
+   156→   156→    navigator.clipboard
+   157→   157→      .writeText(text)
+   158→   158→      .then(() => toast.success(`${label} copied`))
+   159→   159→      .catch(() => toast.error("Copy failed"));
+   160→   160→  }
+   161→   161→
+   162→   162→  return (
+   163→   163→    <div className="mx-auto max-w-7xl space-y-6">
+   164→   164→      <header className="flex flex-wrap items-center justify-between gap-3">
+   165→   165→        <div>
+   166→   166→          <h1 className="font-display text-xl font-bold sm:text-2xl">Bookings</h1>
+   167→   167→          <p className="text-sm text-muted-foreground">Hourly slots, deposits & check-ins</p>
+   168→   168→        </div>
+   169→   169→        <div className="flex items-center gap-2">
+   170→   170→          <Button variant="outline" size="icon" className="border-violet-500/30" onClick={() => shiftDate(-1)} aria-label="Previous day">
+   171→   171→            <ChevronLeft className="h-4 w-4" />
+   172→   172→          </Button>
+   173→   173→          <Input
+   174→   174→            type="date"
+   175→   175→            value={date}
+   176→   176→            onChange={(e) => setDate(e.target.value)}
+   177→   177→            className="w-40 border-violet-500/25 bg-white/5"
+   178→   178→            aria-label="Booking date"
+   179→   179→          />
+   180→   180→          <Button variant="outline" size="icon" className="border-violet-500/30" onClick={() => shiftDate(1)} aria-label="Next day">
+   181→   181→            <ChevronRight className="h-4 w-4" />
+   182→   182→          </Button>
+   183→   183→          <Button variant="outline" size="sm" className="border-cyan-500/40 text-cyan-300" onClick={() => setDate(new Date().toISOString().slice(0, 10))}>
+   184→   184→            Today
+   185→   185→          </Button>
+   186→   186→          <Button className="bg-gradient-to-r from-violet-600 to-cyan-500 text-white hover:opacity-90" onClick={() => setCreateFor({})}>
+   187→   187→            <Plus className="mr-1.5 h-4 w-4" /> New Booking
+   188→   188→          </Button>
+   189→   189→        </div>
+   190→   190→      </header>
+   191→   191→
+   192→   192→      {/* Upcoming today */}
+   193→   193→      <section aria-label="Upcoming bookings" className="space-y-3">
+   194→   194→        <h2 className="font-display text-base font-semibold tracking-wide">UPCOMING {isToday ? "TODAY" : fmtDate(date).toUpperCase()}</h2>
+   195→   195→        {!bookings ? (
+   196→   196→          <Skeleton className="h-24 rounded-2xl bg-white/5" />
+   197→   197→        ) : upcoming.length === 0 ? (
+   198→   198→          <GlassCard className="p-5 text-sm text-muted-foreground">
+   199→   199→            No open bookings for this day. Free cells in the calendar below can take walk-in phone bookings.
+   200→   200→          </GlassCard>
+   201→   201→        ) : (
+   202→   202→          <div className="grid gap-3 lg:grid-cols-2">
+   203→   203→            {upcoming.map((b) => {
+   204→   204→              const start = new Date(b.slotStart);
+   205→   205→              const isUpcoming = start.getTime() >= now.getTime();
+   206→   206→              return (
+   207→   207→                <GlassCard key={b.id} className={"p-4 " + (isUpcoming ? "" : "opacity-60")}>
+   208→   208→                  <div className="flex flex-wrap items-start justify-between gap-3">
+   209→   209→                    <div className="min-w-0">
+   210→   210→                      <p className="font-display text-sm font-bold tabular">
+   211→   211→                        {fmtTime(b.slotStart)} – {fmtTime(b.slotEnd)}
+   212→   212→                      </p>
+   213→   213→                      <p className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+   214→   214→                        <span className={"inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase " + TYPE_STYLES[b.stationType as keyof typeof TYPE_STYLES]?.badge}>
+   215→   215→                          {b.stationName}
+   216→   216→                        </span>
+   217→   217→                        <span className="font-medium">{b.customerName}</span>
+   218→   218→                        <span className="text-xs text-muted-foreground">{b.customerPhone}</span>
+   219→   219→                      </p>
+   220→   220→                      <p className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+   221→   221→                        <Badge variant="outline" className="border-white/15 text-[10px]">{b.source}</Badge>
+   222→   222→                        <span>
+   223→   223→                          Deposit {formatINR(b.depositAmount)}{" "}
+   224→   224→                          {b.depositPaid ? (
+   225→   225→                            <span className="font-semibold text-emerald-400">Paid</span>
+   226→   226→                          ) : (
+   227→   227→                            <span className="font-semibold text-amber-400">Unpaid</span>
+   228→   228→                          )}
+   229→   229→                        </span>
+   230→   230→                      </p>
+   231→   231→                    </div>
+   232→   232→                    <div className="flex flex-col items-end gap-2">
+   233→   233→                      <button
+   234→   234→                        type="button"
+   235→   235→                        onClick={() => copy(b.code, "Booking code")}
+   236→   236→                        className="flex items-center gap-1 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1 font-mono text-xs text-violet-200 hover:bg-violet-500/20"
+   237→   237→                        aria-label="Copy booking code"
+   238→   238→                      >
+   239→   239→                        {b.code} <Copy className="h-3 w-3" />
+   240→   240→                      </button>
+   241→   241→                      <button
+   242→   242→                        type="button"
+   243→   243→                        onClick={() => copy(reminderText(b), "Reminder text")}
+   244→   244→                        className="flex items-center gap-1 text-xs text-emerald-300 hover:text-emerald-200"
+   245→   245→                        aria-label="Copy WhatsApp reminder"
+   246→   246→                      >
+   247→   247→                        <MessageCircle className="h-3.5 w-3.5" /> Copy reminder
+   248→   248→                      </button>
+   249→   249→                    </div>
+   250→   250→                  </div>
+   251→   251→                  <div className="mt-3 flex flex-wrap gap-2 border-t border-white/5 pt-3">
+   252→   252→                    <Button size="sm" variant="outline" className="h-9 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
+   253→   253→                      onClick={() => bookingAction(b, "CHECKIN")} disabled={actionBusy === b.id}>
+   254→   254→                      {actionBusy === b.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+   255→   255→                      Check-in
+   256→   256→                    </Button>
+   257→   257→                    <Button size="sm" variant="outline" className="h-9 border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+   258→   258→                      onClick={() => bookingAction(b, "NOSHOW")} disabled={actionBusy === b.id}>
+   259→   259→                      <UserX className="mr-1.5 h-3.5 w-3.5" /> No-show
+   260→   260→                    </Button>
+   261→   261→                    <Button size="sm" variant="outline" className="h-9 border-red-500/40 text-red-300 hover:bg-red-500/10"
+   262→   262→                      onClick={() => bookingAction(b, "CANCEL")} disabled={actionBusy === b.id}>
+   263→   263→                      <XCircle className="mr-1.5 h-3.5 w-3.5" /> Cancel
+   264→   264→                    </Button>
+   265→   265→                  </div>
+   266→   266→                </GlassCard>
+   267→   267→              );
+   268→   268→            })}
+   269→   269→          </div>
+   270→   270→        )}
+   271→   271→      </section>
+   272→   272→
+   273→   273→      {/* Day calendar */}
+   274→   274→      <section aria-label="Day calendar" className="space-y-3">
+   275→   275→        <div className="flex flex-wrap items-center justify-between gap-2">
+   276→   276→          <h2 className="font-display text-base font-semibold tracking-wide">DAY CALENDAR</h2>
+   277→   277→          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+   278→   278→            <span className="flex items-center gap-1.5"><StatusDot state="DEPOSIT" pulse={false} /> Deposit paid</span>
+   279→   279→            <span className="flex items-center gap-1.5"><StatusDot state="BOOKED" pulse={false} /> Booked</span>
+   280→   280→            <span className="flex items-center gap-1.5"><StatusDot state="ACTIVE" pulse={false} /> Checked-in</span>
+   281→   281→          </div>
+   282→   282→        </div>
+   283→   283→        <p className="text-xs text-muted-foreground sm:hidden">Scroll sideways to see all hours →</p>
+   284→   284→        <div className="overflow-x-auto rounded-2xl border border-violet-500/15 bg-[#0c1122]/60 scroll-neon">
+   285→   285→          <div className="min-w-[900px]">
+   286→   286→            {/* Hour header */}
+   287→   287→            <div className="grid" style={{ gridTemplateColumns: `130px repeat(${HOURS.length}, minmax(76px, 1fr))` }}>
+   288→   288→              <div className="border-b border-r border-white/5 p-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+   289→   289→                Station
+   290→   290→              </div>
+   291→   291→              {HOURS.map((h) => {
+   292→   292→                const cellStart = new Date(dayStart);
+   293→   293→                cellStart.setHours(h, 0, 0, 0);
+   294→   294→                const isNow = isToday && now.getHours() === h;
+   295→   295→                return (
+   296→   296→                  <div
+   297→   297→                    key={h}
+   298→   298→                    className={
+   299→   299→                      "border-b border-white/5 p-1.5 text-center text-[10px] font-medium " +
+   300→   300→                      (isNow ? "border-t-2 border-t-cyan-400 bg-cyan-500/5 text-cyan-300" : "text-muted-foreground")
+   301→   301→                    }
+   302→   302→                  >
+   303→   303→                    {hourLabel(h)}
+   304→   304→                  </div>
+   305→   305→                );
+   306→   306→              })}
+   307→   307→            </div>
+   308→   308→            {/* Station rows */}
+   309→   309→            {(stations.length ? stations : []).map((st) => {
+   310→   310→              const maint = st.status === "MAINTENANCE";
+   311→   311→              return (
+   312→   312→                <div key={st.id} className="grid" style={{ gridTemplateColumns: `130px repeat(${HOURS.length}, minmax(76px, 1fr))` }}>
+   313→   313→                  <div className={"border-b border-r border-white/5 p-2.5 " + (maint ? "opacity-50" : "")}>
+   314→   314→                    <p className="truncate text-xs font-semibold">{st.name}</p>
+   315→   315→                    <p className="text-[10px] text-muted-foreground">{TYPE_STYLES[st.type as keyof typeof TYPE_STYLES]?.label ?? st.type}</p>
+   316→   316→                  </div>
+   317→   317→                  {HOURS.map((h) => {
+   318→   318→                    const cellStart = new Date(dayStart);
+   319→   319→                    cellStart.setHours(h, 0, 0, 0);
+   320→   320→                    const cellEnd = new Date(cellStart.getTime() + 3600_000);
+   321→   321→                    const covered = (bookings ?? []).filter(
+   322→   322→                      (b) =>
+   323→   323→                        b.stationId === st.id &&
+   324→   324→                        ["BOOKED", "CHECKEDIN"].includes(b.status) &&
+   325→   325→                        minutesOverlap(cellStart, cellEnd, new Date(b.slotStart), new Date(b.slotEnd)) > 0
+   326→   326→                    );
+   327→   327→                    const isPast = isToday && cellEnd.getTime() < now.getTime();
+   328→   328→                    const b = covered[0];
+   329→   329→
+   330→   330→                    if (b) {
+   331→   331→                      const bg =
+   332→   332→                        b.status === "CHECKEDIN"
+   333→   333→                          ? "bg-violet-500/25 border-violet-500/50"
+   334→   334→                          : b.depositPaid
+   335→   335→                            ? "bg-emerald-500/20 border-emerald-500/40"
+   336→   336→                            : "bg-amber-500/20 border-amber-500/40";
+   337→   337→                      return (
+   338→   338→                        <div key={h} className={"m-1 rounded-md border p-1 text-[9px] leading-tight " + bg} title={`${b.code} · ${b.customerName}`}>
+   339→   339→                          <p className="truncate font-semibold">{b.customerName.split(" ")[0]}</p>
+   340→   340→                          <p className="truncate font-mono opacity-80">{b.code}</p>
+   341→   341→                        </div>
+   342→   342→                      );
+   343→   343→                    }
+   344→   344→
+   345→   345→                    return (
+   346→   346→                      <button
+   347→   347→                        key={h}
+   348→   348→                        type="button"
+   349→   349→                        disabled={isPast || maint}
+   350→   350→                        onClick={() => setCreateFor({ station: st, hour: h })}
+   351→   351→                        className={
+   352→   352→                          "m-1 rounded-md border p-1 text-[9px] transition-colors " +
+   353→   353→                          (isPast || maint
+   354→   354→                            ? "border-white/5 bg-white/[0.02] opacity-40"
+   355→   355→                            : "border-white/5 bg-white/[0.03] hover:border-violet-500/40 hover:bg-violet-500/10")
+   356→   356→                        }
+   357→   357→                        aria-label={maint ? `${st.name} under maintenance` : `Book ${st.name} ${hourLabel(h)}`}
+   358→   358→                      >
+   359→   359→                        {maint ? "🛠" : isPast ? "" : "+"}
+   360→   360→                      </button>
+   361→   361→                    );
+   362→   362→                  })}
+   363→   363→                </div>
+   364→   364→              );
+   365→   365→            })}
+   366→   366→          </div>
+   367→   367→        </div>
+   368→   368→      </section>
+   369→   369→
+   370→   370→      <CreateBookingDialog
+   371→   371→        open={!!createFor}
+   372→   372→        stations={stations}
+   373→   373→        initialStation={createFor?.station}
+   374→   374→        initialHour={createFor?.hour}
+   375→   375→        date={date}
+   376→   376→        bookings={bookings ?? []}
+   377→   377→        onClose={() => setCreateFor(null)}
+   378→   378→        onCreated={() => {
+   379→   379→          setCreateFor(null);
+   380→   380→          load();
+   381→   381→        }}
+   382→   382→      />
+   383→   383→    </div>
+   384→   384→  );
+   385→   385→}
+   386→   386→
+   387→   387→function CreateBookingDialog({
+   388→   388→  open,
+   389→   389→  stations,
+   390→   390→  initialStation,
+   391→   391→  initialHour,
+   392→   392→  date,
+   393→   393→  bookings,
+   394→   394→  onClose,
+   395→   395→  onCreated,
+   396→   396→}: {
+   397→   397→  open: boolean;
+   398→   398→  stations: StationLite[];
+   399→   399→  initialStation?: StationLite;
+   400→   400→  initialHour?: number;
+   401→   401→  date: string;
+   402→   402→  bookings: Booking[];
+   403→   403→  onClose: () => void;
+   404→   404→  onCreated: () => void;
+   405→   405→}) {
+   406→   406→  const [stationId, setStationId] = React.useState(initialStation?.id ?? "");
+   407→   407→  const [hour, setHour] = React.useState(String(initialHour ?? new Date().getHours() + 1));
+   408→   408→  const [duration, setDuration] = React.useState("1");
+   409→   409→  const [q, setQ] = React.useState("");
+   410→   410→  const [results, setResults] = React.useState<CustomerLite[]>([]);
+   411→   411→  const [customer, setCustomer] = React.useState<CustomerLite | null>(null);
+   412→   412→  const [deposit, setDeposit] = React.useState("");
+   413→   413→  const [depositPaid, setDepositPaid] = React.useState(false);
+   414→   414→  const [source, setSource] = React.useState("PHONE");
+   415→   415→  const [busy, setBusy] = React.useState(false);
+   416→   416→
+   417→   417→  React.useEffect(() => {
+   418→   418→    if (!open) return;
+   419→   419→    setStationId(initialStation?.id ?? "");
+   420→   420→    setHour(String(initialHour ?? Math.min(21, Math.max(OPEN_HOUR, new Date().getHours() + 1))));
+   421→   421→    setDuration("1");
+   422→   422→    setQ("");
+   423→   423→    setResults([]);
+   424→   424→    setCustomer(null);
+   425→   425→    setDeposit(initialStation ? String(Math.round(initialStation.hourlyRate / 2)) : "");
+   426→   426→    setDepositPaid(false);
+   427→   427→    setSource("PHONE");
+   428→   428→  }, [open, initialStation, initialHour]);
+   429→   429→
+   430→   430→  React.useEffect(() => {
+   431→   431→    if (!open) return;
+   432→   432→    const t = setTimeout(async () => {
+   433→   433→      try {
+   434→   434→        const res = await fetch(`/api/members?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+   435→   435→        if (!res.ok) return;
+   436→   436→        const json = await res.json();
+   437→   437→        setResults(json.customers ?? []);
+   438→   438→      } catch {
+   439→   439→        /* ignore */
+   440→   440→      }
+   441→   441→    }, 250);
+   442→   442→    return () => clearTimeout(t);
+   443→   443→  }, [q, open]);
+   444→   444→
+   445→   445→  const startISO = React.useMemo(() => {
+   446→   446→    const d = new Date(date + "T00:00:00");
+   447→   447→    d.setHours(Number(hour) || OPEN_HOUR, 0, 0, 0);
+   448→   448→    return d;
+   449→   449→  }, [date, hour]);
+   450→   450→  const endISO = new Date(startISO.getTime() + Number(duration) * 3600_000);
+   451→   451→
+   452→   452→  const conflict = React.useMemo(() => {
+   453→   453→    if (!stationId) return null;
+   454→   454→    return (
+   455→   455→      bookings.find(
+   456→   456→        (b) =>
+   457→   457→          b.stationId === stationId &&
+   458→   458→          ["BOOKED", "CHECKEDIN"].includes(b.status) &&
+   459→   459→          minutesOverlap(startISO, endISO, new Date(b.slotStart), new Date(b.slotEnd)) > 0
+   460→   460→      ) ?? null
+   461→   461→    );
+   462→   462→  }, [bookings, stationId, startISO, endISO]);
+   463→   463→
+   464→   464→  const canSubmit = stationId && customer && !conflict;
+   465→   465→
+   466→   466→  async function submit() {
+   467→   467→    setBusy(true);
+   468→   468→    try {
+   469→   469→      const res = await fetch("/api/bookings", {
+   470→   470→        method: "POST",
+   471→   471→        headers: { "Content-Type": "application/json" },
+   472→   472→        body: JSON.stringify({
+   473→   473→          stationId,
+   474→   474→          customerId: customer?.id,
+   475→   475→          slotStart: startISO.toISOString(),
+   476→   476→          slotEnd: endISO.toISOString(),
+   477→   477→          depositAmount: Number(deposit) || 0,
+   478→   478→          depositPaid,
+   479→   479→          source,
+   480→   480→        }),
+   481→   481→      });
+   482→   482→      const json = await res.json().catch(() => ({}));
+   483→   483→      if (!res.ok) throw new Error(json.error || "Could not create booking");
+   484→   484→      toast.success(`Booking ${json.booking?.code} created`, {
+   485→   485→        description: `${json.booking?.station?.name} · ${fmtTime(startISO)} – ${fmtTime(endISO)}`,
+   486→   486→      });
+   487→   487→      onCreated();
+   488→   488→    } catch (e) {
+   489→   489→      toast.error(e instanceof Error ? e.message : "Could not create booking");
+   490→   490→    } finally {
+   491→   491→      setBusy(false);
+   492→   492→    }
+   493→   493→  }
+   494→   494→
+   495→   495→  return (
+   496→   496→    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+   497→   497→      <DialogContent className="max-h-[85vh] overflow-y-auto border-violet-500/25 bg-[#0f1526] scroll-neon sm:max-w-md">
+   498→   498→        <DialogHeader>
+   499→   499→          <DialogTitle className="font-display">New Booking</DialogTitle>
+   500→   500→          <DialogDescription>Hold the slot with a deposit to dodge no-shows.</DialogDescription>
+   501→   501→        </DialogHeader>
+   502→   502→
+   503→   503→        <div className="space-y-4">
+   504→   504→          <div className="space-y-1.5">
+   505→   505→            <Label>Station</Label>
+   506→   506→            <Select value={stationId} onValueChange={(v) => {
+   507→   507→              setStationId(v);
+   508→   508→              const st = stations.find((s) => s.id === v);
+   509→   509→              if (st) setDeposit(String(Math.round(st.hourlyRate / 2)));
+   510→   510→            }}>
+   511→   511→              <SelectTrigger className="border-violet-500/25 bg-white/5"><SelectValue placeholder="Pick a station" /></SelectTrigger>
+   512→   512→              <SelectContent className="border-violet-500/25 bg-[#0f1526]">
+   513→   513→                {stations.filter((s) => s.status !== "MAINTENANCE").map((s) => (
+   514→   514→                  <SelectItem key={s.id} value={s.id}>
+   515→   515→                    {s.name} · {s.type} · ₹{s.hourlyRate}/hr
+   516→   516→                  </SelectItem>
+   517→   517→                ))}
+   518→   518→              </SelectContent>
+   519→   519→            </Select>
+   520→   520→          </div>
+   521→   521→
+   522→   522→          <div className="grid grid-cols-3 gap-2">
+   523→   523→            <div className="col-span-1 space-y-1.5">
+   524→   524→              <Label>Start</Label>
+   525→   525→              <Select value={hour} onValueChange={setHour}>
+   526→   526→                <SelectTrigger className="border-violet-500/25 bg-white/5"><SelectValue /></SelectTrigger>
+   527→   527→                <SelectContent className="max-h-56 border-violet-500/25 bg-[#0f1526]">
+   528→   528→                  {HOURS.map((h) => (
+   529→   529→                    <SelectItem key={h} value={String(h)}>{hourLabel(h)}</SelectItem>
+   530→   530→                  ))}
+   531→   531→                </SelectContent>
+   532→   532→              </Select>
+   533→   533→            </div>
+   534→   534→            <div className="col-span-1 space-y-1.5">
+   535→   535→              <Label>Duration</Label>
+   536→   536→              <Select value={duration} onValueChange={setDuration}>
+   537→   537→                <SelectTrigger className="border-violet-500/25 bg-white/5"><SelectValue /></SelectTrigger>
+   538→   538→                <SelectContent className="border-violet-500/25 bg-[#0f1526]">
+   539→   539→                  {["1", "2", "3"].map((d) => (
+   540→   540→                    <SelectItem key={d} value={d}>{d} hour{d === "1" ? "" : "s"}</SelectItem>
+   541→   541→                  ))}
+   542→   542→                </SelectContent>
+   543→   543→              </Select>
+   544→   544→            </div>
+   545→   545→            <div className="col-span-1 space-y-1.5">
+   546→   546→              <Label>Date</Label>
+   547→   547→              <div className="rounded-md border border-violet-500/25 bg-white/5 px-3 py-2 text-sm">{fmtDate(date + "T00:00:00")}</div>
+   548→   548→            </div>
+   549→   549→          </div>
+   550→   550→
+   551→   551→          {conflict ? (
+   552→   552→            <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+   553→   553→              Conflicts with {conflict.code} ({fmtTime(conflict.slotStart)}–{fmtTime(conflict.slotEnd)})
+   554→   554→            </p>
+   555→   555→          ) : (
+   556→   556→            <p className="text-xs text-muted-foreground">
+   557→   557→              Slot: {fmtTime(startISO.toISOString())} – {fmtTime(endISO.toISOString())}
+   558→   558→            </p>
+   559→   559→          )}
+   560→   560→
+   561→   561→          <div className="space-y-1.5">
+   562→   562→            <Label>Customer</Label>
+   563→   563→            {customer ? (
+   564→   564→              <div className="flex items-center justify-between rounded-xl border border-violet-500/40 bg-violet-500/10 px-3 py-2">
+   565→   565→                <span className="text-sm">{customer.name} · {customer.phone}</span>
+   566→   566→                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setCustomer(null)}>Change</Button>
+   567→   567→              </div>
+   568→   568→            ) : (
+   569→   569→              <>
+   570→   570→                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search phone or name…" className="border-violet-500/25 bg-white/5" />
+   571→   571→                <div className="max-h-40 space-y-1 overflow-y-auto scroll-neon pr-1">
+   572→   572→                  {results.map((c) => (
+   573→   573→                    <button key={c.id} type="button"
+   574→   574→                      onClick={() => setCustomer(c)}
+   575→   575→                      className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left text-sm hover:border-violet-500/40">
+   576→   576→                      <span>{c.name}</span>
+   577→   577→                      <span className="text-xs text-muted-foreground">{c.phone}</span>
+   578→   578→                    </button>
+   579→   579→                  ))}
+   580→   580→                </div>
+   581→   581→              </>
+   582→   582→            )}
+   583→   583→          </div>
+   584→   584→
+   585→   585→          <div className="grid grid-cols-2 gap-3">
+   586→   586→            <div className="space-y-1.5">
+   587→   587→              <Label htmlFor="bk-deposit">Deposit (₹)</Label>
+   588→   588→              <Input id="bk-deposit" value={deposit} onChange={(e) => setDeposit(e.target.value.replace(/[^\d.]/g, ""))} placeholder="250" inputMode="decimal" className="border-violet-500/25 bg-white/5" />
+   589→   589→            </div>
+   590→   590→            <div className="space-y-1.5">
+   591→   591→              <Label>Source</Label>
+   592→   592→              <Select value={source} onValueChange={setSource}>
+   593→   593→                <SelectTrigger className="border-violet-500/25 bg-white/5"><SelectValue /></SelectTrigger>
+   594→   594→                <SelectContent className="border-violet-500/25 bg-[#0f1526]">
+   595→   595→                  {["PHONE", "WALKIN", "ONLINE"].map((s) => (
+   596→   596→                    <SelectItem key={s} value={s}>{s}</SelectItem>
+   597→   597→                  ))}
+   598→   598→                </SelectContent>
+   599→   599→              </Select>
+   600→   600→            </div>
+   601→   601→          </div>
+   602→   602→          <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+   603→   603→            <Label htmlFor="bk-paid" className="text-sm">Deposit received</Label>
+   604→   604→            <Switch id="bk-paid" checked={depositPaid} onCheckedChange={setDepositPaid} />
+   605→   605→          </div>
+   606→   606→
+   607→   607→          <Button onClick={submit} disabled={!canSubmit || busy} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
+   608→   608→            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarDays className="mr-2 h-4 w-4" />}
+   609→   609→            {busy ? "Booking…" : "Create Booking"}
+   610→   610→          </Button>
+   611→   611→        </div>
+   612→   612→      </DialogContent>
+   613→   613→    </Dialog>
+   614→   614→  );
+   615→   615→}
+   616→   616→

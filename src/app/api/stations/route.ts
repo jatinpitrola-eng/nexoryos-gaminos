@@ -15,7 +15,7 @@ export async function GET() {
       orderBy: { name: "asc" },
       include: {
         sessions: {
-          where: { status: "ACTIVE" },
+          where: { status: { in: ["ACTIVE", "PAUSED"] } },
           include: { customer: { select: { name: true, phone: true } } },
           take: 1,
         },
@@ -37,6 +37,9 @@ export async function GET() {
               rateSnapshot: active.rateSnapshot,
               customerName: active.customer?.name ?? null,
               customerPhone: active.customer?.phone ?? null,
+              sessionStatus: active.status as "ACTIVE" | "PAUSED",
+              pausedMinutes: active.pausedMinutes,
+              pausedAt: active.pausedAt ? active.pausedAt.toISOString() : null,
             }
           : null,
       };
@@ -62,7 +65,7 @@ export async function PATCH(req: Request) {
 
     const station = await db.station.findUnique({
       where: { id: stationId },
-      include: { sessions: { where: { status: "ACTIVE" } } },
+      include: { sessions: { where: { status: { in: ["ACTIVE", "PAUSED"] } } } },
     });
     if (!station) return badRequest("Station not found");
     if (station.sessions.length > 0) return badRequest("End the active session before maintenance");

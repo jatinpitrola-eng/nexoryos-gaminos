@@ -157,6 +157,8 @@ export async function GET(req: Request) {
       orderBy: { date: "desc" },
       select: { title: true, category: true, amount: true, date: true },
     });
+    const expensesTotal = expenses.reduce((sum, x) => sum + x.amount, 0);
+    const periodRevenue = gamingTotal + fnbSessionTotal + fnbStandaloneTotal + membershipsTotal;
 
     return NextResponse.json({
       range,
@@ -171,6 +173,8 @@ export async function GET(req: Request) {
         memberships: Math.round(membershipsTotal),
         total: Math.round(gamingTotal + fnbSessionTotal + fnbStandaloneTotal + membershipsTotal),
       },
+      expensesTotal: Math.round(expensesTotal),
+      netProfit: Math.round(periodRevenue - expensesTotal),
       expenses,
     });
   } catch (e) {

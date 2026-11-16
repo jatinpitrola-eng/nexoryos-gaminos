@@ -113,12 +113,14 @@ model Session {
   startedAt     DateTime
   endedAt       DateTime?
   plannedMinutes Int?
+  pausedMinutes Int       @default(0) // accumulated pause time, subtracted from billable minutes
+  pausedAt      DateTime? // set while status = PAUSED
   rateSnapshot  Float // hourly rate applied at start
   stationFee    Float     @default(0)
   fnbTotal      Float     @default(0)
   discount      Float     @default(0)
   total         Float     @default(0)
-  status        String    @default("ACTIVE") // ACTIVE | COMPLETED | CANCELLED
+  status        String    @default("ACTIVE") // ACTIVE | PAUSED | COMPLETED | CANCELLED
 
   station  Station   @relation(fields: [stationId], references: [id])
   customer Customer? @relation(fields: [customerId], references: [id])
@@ -141,6 +143,7 @@ model Booking {
   depositPaid   Boolean  @default(false)
   status        String   @default("BOOKED") // BOOKED | CHECKEDIN | NOSHOW | CANCELLED | COMPLETED
   source        String   @default("PHONE") // WALKIN | PHONE | ONLINE
+  notify        Boolean  @default(false) // customer asked to be notified/confirmed
 
   station  Station  @relation(fields: [stationId], references: [id])
   customer Customer @relation(fields: [customerId], references: [id])
@@ -216,4 +219,36 @@ model Expense {
   date     DateTime
 
   createdAt DateTime @default(now())
+}
+
+// ---------- Esports / Tournaments ----------
+
+model Tournament {
+  id          String   @id @default(cuid())
+  name        String
+  game        String
+  stationType String
+  startsAt    DateTime
+  entryFee    Float    @default(0)
+  prizePool   Float    @default(0)
+  maxPlayers  Int      @default(16)
+  status      String   @default("UPCOMING") // UPCOMING | ONGOING | COMPLETED | CANCELLED
+  notes       String?
+
+  entries TournamentEntry[]
+
+  createdAt DateTime @default(now())
+}
+
+model TournamentEntry {
+  id           String   @id @default(cuid())
+  tournamentId String
+  name         String
+  phone        String?
+  customerId   String?
+  feePaid      Boolean  @default(false)
+  position     Int? // 1 = winner, 2 = runner-up, 3 = semi-finalist
+  createdAt    DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 }

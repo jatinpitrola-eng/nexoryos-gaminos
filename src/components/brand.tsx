@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-/** GAMINOS wordmark with neon gradient. */
+/** NEXORYOS wordmark with neon gradient. */
 export function Brand({
   size = "md",
   withByline = true,
@@ -22,10 +22,10 @@ export function Brand({
         <Image src="/nexoryos.png" alt="Nexoryos logo" width={36} height={36} className="h-full w-full object-contain p-0.5" />
       </span>
       <span className="leading-none">
-        <span className={cn("font-display font-extrabold tracking-widest neon-text", sizes[size])}>GAMINOS</span>
+        <span className={cn("font-display font-extrabold tracking-widest neon-text", sizes[size])}>NEXORYOS</span>
         {withByline ? (
           <span className="ml-1.5 hidden align-middle text-[10px] font-medium uppercase tracking-widest text-muted-foreground sm:inline">
-            by Nexoryos
+            GameZone OS
           </span>
         ) : null}
       </span>

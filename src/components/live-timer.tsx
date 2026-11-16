@@ -11,17 +11,22 @@ function elapsedParts(fromMs: number) {
   return { h, m, s, totalMin: Math.floor(totalSec / 60) };
 }
 
-/** Live elapsed timer, ticks every second. Renders 1:23:45 */
+/** Live elapsed timer, ticks every second. Renders 1:23:45. Pause-aware when pausedMinutes/pausedAt are passed. */
 export function LiveTimer({
   startedAt,
+  pausedMinutes = 0,
+  pausedAt,
   className,
   prefix,
 }: {
   startedAt: string | Date;
+  pausedMinutes?: number;
+  pausedAt?: string | Date | null;
   className?: string;
   prefix?: string;
 }) {
   const start = typeof startedAt === "string" ? new Date(startedAt).getTime() : startedAt.getTime();
+  const paused = pausedAt ? (typeof pausedAt === "string" ? new Date(pausedAt).getTime() : pausedAt.getTime()) : null;
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -29,20 +34,38 @@ export function LiveTimer({
     return () => clearInterval(t);
   }, []);
 
-  const { h, m, s } = elapsedParts((now ?? start) - start);
+  const currentPauseMs = paused ? Math.max(0, (now ?? Date.now()) - paused) : 0;
+  const elapsedMs = Math.max(0, (now ?? start) - start - pausedMinutes * 60000 - currentPauseMs);
+  const { h, m, s } = elapsedParts(elapsedMs);
   const text = `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 
   return (
-    <span className={cn("tabular font-display font-semibold text-cyan-300", className)} suppressHydrationWarning>
+    <span
+      className={cn("tabular font-display font-semibold", paused ? "text-amber-300" : "text-cyan-300", className)}
+      suppressHydrationWarning
+    >
       {prefix ? `${prefix} ` : ""}
       {text}
     </span>
   );
 }
 
-/** Live cost ticker: rate/60 × elapsed minutes, rounded to rupee. */
-export function LiveCost({ startedAt, rate, className }: { startedAt: string | Date; rate: number; className?: string }) {
+/** Live cost ticker: rate/60 × billable minutes (pause-aware), rounded to rupee. */
+export function LiveCost({
+  startedAt,
+  rate,
+  pausedMinutes = 0,
+  pausedAt,
+  className,
+}: {
+  startedAt: string | Date;
+  rate: number;
+  pausedMinutes?: number;
+  pausedAt?: string | Date | null;
+  className?: string;
+}) {
   const start = typeof startedAt === "string" ? new Date(startedAt).getTime() : startedAt.getTime();
+  const paused = pausedAt ? (typeof pausedAt === "string" ? new Date(pausedAt).getTime() : pausedAt.getTime()) : null;
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -50,7 +73,9 @@ export function LiveCost({ startedAt, rate, className }: { startedAt: string | D
     return () => clearInterval(t);
   }, []);
 
-  const { totalMin } = elapsedParts((now ?? start) - start);
+  const currentPauseMs = paused ? Math.max(0, (now ?? Date.now()) - paused) : 0;
+  const elapsedMs = Math.max(0, (now ?? start) - start - pausedMinutes * 60000 - currentPauseMs);
+  const { totalMin } = elapsedParts(elapsedMs);
   const cost = Math.round((rate * Math.max(1, totalMin)) / 60);
 
   return (

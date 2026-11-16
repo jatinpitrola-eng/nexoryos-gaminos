@@ -4,6 +4,8 @@ import * as React from "react";
 import {
   BadgeIndianRupee,
   Loader2,
+  Pause,
+  Play,
   Plus,
   RefreshCw,
   Search,
@@ -31,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { TYPE_STYLES } from "@/lib/ui-meta";
 import { fmtTime, fmtDateTime } from "@/lib/hours";
+import { cn } from "@/lib/utils";
 import { formatINR } from "@/lib/money";
 import type { FloorStation } from "@/lib/types";
 
@@ -109,6 +112,24 @@ export default function StationsPage() {
     }
   }
 
+  async function togglePause(station: FloorStation) {
+    const active = station.activeSession;
+    if (!active) return;
+    setBusyId(station.id);
+    const pausing = active.sessionStatus !== "PAUSED";
+    try {
+      const res = await fetch(`/api/sessions/${active.id}/${pausing ? "pause" : "resume"}`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Failed");
+      toast.success(pausing ? `${station.name} paused — timer frozen` : `${station.name} resumed`);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const counts = React.useMemo(() => {
     const s = stations ?? [];
     return {
@@ -151,6 +172,7 @@ export default function StationsPage() {
               onStart={() => setStartFor(s)}
               onBill={() => setBillFor(s)}
               onToggleMaintenance={() => toggleMaintenance(s)}
+              onTogglePause={() => togglePause(s)}
             />
           ))}
         </div>
@@ -185,12 +207,14 @@ function StationCard({
   onStart,
   onBill,
   onToggleMaintenance,
+  onTogglePause,
 }: {
   station: FloorStation;
   busy: boolean;
   onStart: () => void;
   onBill: () => void;
   onToggleMaintenance: () => void;
+  onTogglePause: () => void;
 }) {
   const style = TYPE_STYLES[station.type];
   const border =
@@ -217,11 +241,28 @@ function StationCard({
 
       {station.activeSession ? (
         <div className="mt-4 flex-1 space-y-1.5 rounded-xl border border-white/5 bg-white/[0.03] p-3">
-          <p className="text-sm font-semibold">{station.activeSession.customerName ?? "Walk-in guest"}</p>
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            {station.activeSession.customerName ?? "Walk-in guest"}
+            {station.activeSession.sessionStatus === "PAUSED" ? (
+              <Badge className="border-amber-500/40 bg-amber-500/10 text-amber-300">PAUSED</Badge>
+            ) : null}
+          </p>
           <p className="text-xs text-muted-foreground">{station.activeSession.customerPhone} · from {fmtTime(station.activeSession.startedAt)}</p>
           <div className="flex items-center justify-between pt-1.5">
-            <LiveTimer startedAt={station.activeSession.startedAt} className="text-sm" prefix="⏱" />
-            <LiveCost startedAt={station.activeSession.startedAt} rate={station.activeSession.rateSnapshot} className="text-sm" />
+            <LiveTimer
+              startedAt={station.activeSession.startedAt}
+              pausedMinutes={station.activeSession.pausedMinutes ?? 0}
+              pausedAt={station.activeSession.pausedAt ?? null}
+              className="text-sm"
+              prefix="⏱"
+            />
+            <LiveCost
+              startedAt={station.activeSession.startedAt}
+              rate={station.activeSession.rateSnapshot}
+              pausedMinutes={station.activeSession.pausedMinutes ?? 0}
+              pausedAt={station.activeSession.pausedAt ?? null}
+              className="text-sm"
+            />
           </div>
         </div>
       ) : station.status === "MAINTENANCE" ? (
@@ -254,6 +295,21 @@ function StationCard({
           </Button>
         ) : (
           <>
+            <Button
+              variant="outline"
+              size="icon"
+              className={cn(
+                "h-11 w-11 shrink-0",
+                station.activeSession?.sessionStatus === "PAUSED"
+                  ? "border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
+                  : "border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+              )}
+              onClick={onTogglePause}
+              disabled={busy}
+              aria-label={station.activeSession?.sessionStatus === "PAUSED" ? "Resume session" : "Pause session"}
+            >
+              {station.activeSession?.sessionStatus === "PAUSED" ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+            </Button>
             <Button
               variant="outline"
               className="h-11 flex-1 border-amber-500/50 text-amber-200 hover:bg-amber-500/10"

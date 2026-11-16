@@ -23,7 +23,7 @@ export async function GET() {
           orderBy: { name: "asc" },
           include: {
             sessions: {
-              where: { status: "ACTIVE" },
+              where: { status: { in: ["ACTIVE", "PAUSED"] } },
               include: { customer: { select: { name: true, phone: true } } },
               take: 1,
             },
@@ -50,7 +50,7 @@ export async function GET() {
         db.customer.count(),
       ]);
 
-    const activeSessionsCount = await db.session.count({ where: { status: "ACTIVE" } });
+    const activeSessionsCount = await db.session.count({ where: { status: { in: ["ACTIVE", "PAUSED"] } } });
     const todayActivity = await db.session.findMany({
       where: { startedAt: { gte: todayStart, lte: todayEnd }, status: { not: "CANCELLED" } },
       select: { startedAt: true, endedAt: true, status: true },
@@ -79,6 +79,9 @@ export async function GET() {
               rateSnapshot: active.rateSnapshot,
               customerName: active.customer?.name ?? null,
               customerPhone: active.customer?.phone ?? null,
+              sessionStatus: active.status as "ACTIVE" | "PAUSED",
+              pausedMinutes: active.pausedMinutes,
+              pausedAt: active.pausedAt ? active.pausedAt.toISOString() : null,
             }
           : null,
       };
@@ -109,7 +112,7 @@ export async function GET() {
       hourStart.setHours(h, 0, 0, 0);
       const hourEnd = new Date(hourStart.getTime() + 3600_000);
       const hasActivity = todayActivity.some((s) => {
-        const end = s.endedAt ?? (s.status === "ACTIVE" ? now : s.startedAt);
+        const end = s.endedAt ?? (s.status === "ACTIVE" || s.status === "PAUSED" ? now : s.startedAt);
         return minutesOverlap(s.startedAt, end, hourStart, hourEnd) > 0;
       });
       if (!hasActivity) emptyHours.push(h);
