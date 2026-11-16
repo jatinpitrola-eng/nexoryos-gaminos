@@ -35,6 +35,11 @@ export interface FloorStation {
   type: StationType;
   status: StationStatus;
   hourlyRate: number;
+  /** Currently applicable rate after pricing rules (equals hourlyRate when no rule matches). */
+  effectiveRate?: number;
+  /** Name of the winning pricing rule, e.g. "Student Special (PC)" — null when base rate applies. */
+  effectiveRuleName?: string | null;
+  effectiveKind?: string | null;
   activeSession: {
     id: string;
     startedAt: string; // ISO

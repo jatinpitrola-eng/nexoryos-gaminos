@@ -44,7 +44,9 @@ interface Preview {
   matches: { name: string; kind: string; ratePerHour: number }[];
 }
 
-const PRIORITY: Record<string, number> = { STUDENT: 4, HAPPYHOUR: 3, OFFPEAK: 2, PEAK: 1 };
+// Display rank: P1 = applied first / wins (Student), P4 = last resort (Peak).
+// Engine sort is by RULE_PRIORITY weight — these labels express the same order.
+const PRIORITY_RANK: Record<string, number> = { STUDENT: 1, HAPPYHOUR: 2, OFFPEAK: 3, PEAK: 4 };
 
 export default function PricingPage() {
   const [rules, setRules] = React.useState<Rule[] | null>(null);
@@ -140,6 +142,7 @@ export default function PricingPage() {
           <p className="text-sm text-muted-foreground">
             Rules apply automatically — highest priority wins: Student &gt; Happy Hour &gt; Off-Peak &gt; Peak &gt; base rate.
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">Chip numbers = apply order: <span className="font-semibold text-violet-300">P1 wins first</span>, P4 is the fallback tier.</p>
         </div>
         <Button className="bg-gradient-to-r from-violet-600 to-cyan-500 text-white hover:opacity-90" onClick={() => setEditing("new")}>
           <Plus className="mr-1.5 h-4 w-4" /> New Rule
@@ -157,7 +160,7 @@ export default function PricingPage() {
             <p className="text-xs text-muted-foreground">Pick a station type & moment — see exactly what the customer pays.</p>
           </div>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
             <Label>Station type</Label>
             <Select value={previewType} onValueChange={(v) => setPreviewType(v as StationType)}>
@@ -208,11 +211,11 @@ export default function PricingPage() {
 
       {/* Rules grouped by station type */}
       {!rules ? (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl bg-white/5" />)}
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {STATION_TYPES.map((t) => {
             const list = grouped.get(t) ?? [];
             return (
@@ -234,7 +237,7 @@ export default function PricingPage() {
                             <p className="flex items-center gap-2 text-sm font-medium">
                               {r.name}
                               <Badge className={"border text-[10px] " + RULE_KIND_STYLES[r.kind as RuleKind]}>
-                                {RULE_KIND_LABEL[r.kind as RuleKind]} · P{PRIORITY[r.kind] ?? 0}
+                                {RULE_KIND_LABEL[r.kind as RuleKind]} · P{PRIORITY_RANK[r.kind] ?? "—"}
                               </Badge>
                             </p>
                             <p className="mt-1 text-xs text-muted-foreground">
@@ -322,7 +325,8 @@ function RuleDialog({
     setDays((d) => d ^ (1 << i));
   }
 
-  async function save() {
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
     setBusy(true);
     try {
       const body = {
@@ -358,9 +362,9 @@ function RuleDialog({
       <DialogContent className="max-h-[85vh] overflow-y-auto border-violet-500/25 bg-[#0f1526] scroll-neon sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display">{rule ? "Edit Rule" : "New Pricing Rule"}</DialogTitle>
-          <DialogDescription>Priority: Student (4) &gt; Happy Hour (3) &gt; Off-Peak (2) &gt; Peak (1).</DialogDescription>
+          <DialogDescription>Apply order: Student (P1) &gt; Happy Hour (P2) &gt; Off-Peak (P3) &gt; Peak (P4). Lower number wins.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <form onSubmit={save} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="rule-name">Rule name</Label>
             <Input id="rule-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Weekend Night Peak" className="border-violet-500/25 bg-white/5" />
@@ -380,7 +384,7 @@ function RuleDialog({
               <Select value={kind} onValueChange={(v) => setKind(v as RuleKind)}>
                 <SelectTrigger className="border-violet-500/25 bg-white/5"><SelectValue /></SelectTrigger>
                 <SelectContent className="border-violet-500/25 bg-[#0f1526]">
-                  {RULE_KINDS.map((k) => <SelectItem key={k} value={k}>{RULE_KIND_LABEL[k]} (P{PRIORITY[k]})</SelectItem>)}
+                  {RULE_KINDS.map((k) => <SelectItem key={k} value={k}>{RULE_KIND_LABEL[k]} (P{PRIORITY_RANK[k]})</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -435,11 +439,11 @@ function RuleDialog({
             <Label className="text-sm">Active</Label>
             <Switch checked={isActive} onCheckedChange={setIsActive} />
           </div>
-          <Button onClick={save} disabled={busy || !name.trim() || !(Number(rate) > 0)} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
+          <Button type="submit" disabled={busy || !name.trim() || !(Number(rate) > 0)} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             {rule ? "Save Changes" : "Create Rule"}
           </Button>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

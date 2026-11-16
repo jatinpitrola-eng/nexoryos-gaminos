@@ -46,6 +46,8 @@ interface Invoice {
     endedAt: string | null;
     status: string;
     rateSnapshot: number;
+    rateRule?: string | null;
+    bonusMinutesUsed?: number;
     stationFee: number;
     fnbTotal: number;
     discount: number;
@@ -237,6 +239,8 @@ export default function BillingPage() {
                         <tr className="border-b border-black/5">
                           <td className="py-1.5">
                             {invoice.station.name} ({invoice.station.type}){mins ? ` · ${mins} min × ${formatINR(invoice.session.rateSnapshot)}/hr` : ""}
+                            {invoice.session.rateRule ? ` · ${invoice.session.rateRule}` : ""}
+                            {invoice.session.bonusMinutesUsed ? ` · ${invoice.session.bonusMinutesUsed} bonus min free` : ""}
                           </td>
                           <td className="py-1.5 text-right tabular">{formatINR2(invoice.session.stationFee)}</td>
                         </tr>

@@ -59,6 +59,7 @@ export async function POST(req: Request) {
     const customerId = body?.customerId ? String(body.customerId) : undefined;
     const quick = body?.quickCustomer as { name?: string; phone?: string } | undefined;
     const plannedMinutes = body?.plannedMinutes ? Number(body.plannedMinutes) : undefined;
+    const useBonusRequested = Math.max(0, Math.round(Number(body?.useBonusMinutes) || 0));
 
     if (!stationId) return badRequest("Station is required");
 
@@ -71,11 +72,11 @@ export async function POST(req: Request) {
       return badRequest("Station is not free");
 
     // Resolve or quick-add customer
-    let customer: { id: string; name: string } | null = null;
+    let customer: { id: string; name: string; bonusMinutes: number } | null = null;
     if (customerId) {
       customer = await db.customer.findUnique({
         where: { id: customerId },
-        select: { id: true, name: true },
+        select: { id: true, name: true, bonusMinutes: true },
       });
       if (!customer) return badRequest("Customer not found");
     } else if (quick && quick.name && quick.phone) {
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
         where: { phone },
         update: { name: quick.name.trim() },
         create: { name: quick.name.trim(), phone },
-        select: { id: true, name: true },
+        select: { id: true, name: true, bonusMinutes: true },
       });
     } else {
       return badRequest("Pick a customer or add a new one with name + phone");
@@ -94,25 +95,43 @@ export async function POST(req: Request) {
     const now = new Date();
     const resolved = await resolveRate(station.type, station.hourlyRate, now);
 
-    const [session, updatedStation] = await db.$transaction([
-      db.session.create({
+    // Bonus (free-play) minutes: capped by what the customer actually has
+    const bonusUse = Math.min(useBonusRequested, customer.bonusMinutes);
+
+    const result = await db.$transaction(async (tx) => {
+      const session = await tx.session.create({
         data: {
           stationId: station.id,
           customerId: customer.id,
           startedAt: now,
-          plannedMinutes: plannedMinutes && plannedMinutes > 0 ? Math.round(plannedMinutes) : null,
+          plannedMinutes:
+            plannedMinutes && plannedMinutes > 0
+              ? Math.round(plannedMinutes)
+              : bonusUse > 0
+                ? bonusUse
+                : null,
           rateSnapshot: resolved.rate,
+          rateRule: resolved.ruleName,
+          bonusMinutesUsed: bonusUse,
           status: "ACTIVE",
         },
         include: { customer: { select: { id: true, name: true, phone: true, walletBalance: true } } },
-      }),
-      db.station.update({ where: { id: station.id }, data: { status: "BUSY" } }),
-    ]);
+      });
+      const updatedStation = await tx.station.update({ where: { id: station.id }, data: { status: "BUSY" } });
+      if (bonusUse > 0) {
+        await tx.customer.update({
+          where: { id: customer.id },
+          data: { bonusMinutes: { decrement: bonusUse } },
+        });
+      }
+      return { session, updatedStation };
+    });
 
     return NextResponse.json(
       {
-        session,
-        station: updatedStation,
+        session: result.session,
+        station: result.updatedStation,
+        bonusUsed: bonusUse,
         rate: { rate: resolved.rate, kind: resolved.kind, ruleName: resolved.ruleName },
       },
       { status: 201 }

@@ -14,7 +14,11 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const fromParam = url.searchParams.get("from");
     const toParam = url.searchParams.get("to");
-    const status = url.searchParams.get("status") || "COMPLETED";
+    // Normalize status casing and fall back to ALL for unknown values — a bad
+    // filter must never silently return an empty list.
+    const statusRaw = (url.searchParams.get("status") || "ALL").trim().toUpperCase();
+    const VALID_STATUSES = ["COMPLETED", "ACTIVE", "PAUSED", "CANCELLED", "ALL"];
+    const status = VALID_STATUSES.includes(statusRaw) ? statusRaw : "ALL";
 
     const from = fromParam && !isNaN(new Date(fromParam).getTime()) ? startOfDay(new Date(fromParam)) : addDays(startOfDay(new Date()), -7);
     const to = toParam && !isNaN(new Date(toParam).getTime()) ? endOfDay(new Date(toParam)) : endOfDay(new Date());
@@ -45,6 +49,7 @@ export async function GET(req: Request) {
         customerName: s.customer?.name ?? "Walk-in guest",
         customerPhone: s.customer?.phone ?? "",
         rateSnapshot: s.rateSnapshot,
+        rateRule: s.rateRule,
         stationFee: s.stationFee,
         fnbTotal: s.fnbTotal,
         discount: s.discount,

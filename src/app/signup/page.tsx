@@ -87,7 +87,7 @@ export default function SignupPage() {
                 placeholder="owner@yourzone.in" className="border-violet-500/25 bg-white/5 pl-9 focus-visible:ring-violet-400" autoComplete="email" />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
               <div className="relative">

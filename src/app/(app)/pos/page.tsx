@@ -169,7 +169,7 @@ export default function PosPage() {
         </GlassCard>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
         {/* Items */}
         <section className="space-y-4">
           <Tabs value={category} onValueChange={setCategory}>
@@ -333,7 +333,8 @@ function NewItemDialog({ open, onClose, onCreated }: { open: boolean; onClose: (
     }
   }, [open]);
 
-  async function save() {
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
     setBusy(true);
     try {
       const res = await fetch("/api/pos/items", {
@@ -360,7 +361,7 @@ function NewItemDialog({ open, onClose, onCreated }: { open: boolean; onClose: (
           <DialogTitle className="font-display">New F&B Item</DialogTitle>
           <DialogDescription>Add something new to the counter menu.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <form onSubmit={save} className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="ni-name">Name</Label>
             <Input id="ni-name" value={name} onChange={(e) => setName(e.target.value)} className="border-violet-500/25 bg-white/5" />
@@ -390,10 +391,10 @@ function NewItemDialog({ open, onClose, onCreated }: { open: boolean; onClose: (
               <Input id="ni-low" value={lowAlert} onChange={(e) => setLowAlert(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className="border-violet-500/25 bg-white/5" />
             </div>
           </div>
-          <Button onClick={save} disabled={busy || !name.trim() || !(Number(price) > 0)} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
+          <Button type="submit" disabled={busy || !name.trim() || !(Number(price) > 0)} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />} Add Item
           </Button>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

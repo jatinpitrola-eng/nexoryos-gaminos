@@ -62,7 +62,8 @@ export default function SettingsPage() {
     load();
   }, [load]);
 
-  async function save() {
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
     setSaveBusy(true);
     try {
       const res = await fetch("/api/settings", {
@@ -88,7 +89,7 @@ export default function SettingsPage() {
         <p className="text-sm text-muted-foreground">Zone profile, open hours & team.</p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Zone profile */}
         <GlassCard className="p-5 sm:p-6">
           <div className="flex items-center gap-2.5">
@@ -103,7 +104,7 @@ export default function SettingsPage() {
           {!settings ? (
             <Skeleton className="mt-4 h-40 bg-white/5" />
           ) : (
-            <div className="mt-5 space-y-4">
+            <form onSubmit={save} className="mt-5 space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="st-zone">Zone name</Label>
                 <Input id="st-zone" value={zoneName} onChange={(e) => setZoneName(e.target.value)} className="border-violet-500/25 bg-white/5" />
@@ -130,10 +131,10 @@ export default function SettingsPage() {
                   </Select>
                 </div>
               </div>
-              <Button onClick={save} disabled={saveBusy} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
+              <Button type="submit" disabled={saveBusy} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
                 {saveBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save Settings
               </Button>
-            </div>
+            </form>
           )}
         </GlassCard>
 
@@ -201,7 +202,8 @@ function AddStaffDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
     }
   }, [open]);
 
-  async function save() {
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
     setBusy(true);
     try {
       const res = await fetch("/api/settings/staff", {
@@ -228,7 +230,7 @@ function AddStaffDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
           <DialogTitle className="font-display">Add Staff Account</DialogTitle>
           <DialogDescription>Staff can run stations, POS, bookings & shifts — no reports or pricing.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <form onSubmit={save} className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="sf-name">Name</Label>
             <Input id="sf-name" value={name} onChange={(e) => setName(e.target.value)} className="border-violet-500/25 bg-white/5" />
@@ -241,10 +243,10 @@ function AddStaffDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
             <Label htmlFor="sf-pw">Password (min 6)</Label>
             <Input id="sf-pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="border-violet-500/25 bg-white/5" />
           </div>
-          <Button onClick={save} disabled={busy || !name.trim() || !email.trim() || password.length < 6} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
+          <Button type="submit" disabled={busy || !name.trim() || !email.trim() || password.length < 6} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />} Create Account
           </Button>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

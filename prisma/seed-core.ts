@@ -161,6 +161,99 @@ export async function runSeed(): Promise<{ stations: number; customers: number }
     });
   }
 
+  // ---------- Vendors & purchases (stock-in demo) ----------
+  const vendorDefs = [
+    { name: "Sharma Distributors", phone: "9876511100", gstin: "24ABCDE1234F1Z5", notes: "Energy drinks & snacks — weekly supply" },
+    { name: "Vishal Beverage Suppliers", phone: "9825522200", gstin: "24FGHIJ5678K1Z2", notes: "Coffees & mocktails — 3-day credit" },
+  ];
+  const vendorIds: Record<string, string> = {};
+  for (const v of vendorDefs) {
+    const existing = await db.vendor.findFirst({ where: { name: v.name } });
+    const vd = existing ?? (await db.vendor.create({ data: v }));
+    vendorIds[v.name] = vd.id;
+  }
+  const purchaseDefs = [
+    { vendor: "Sharma Distributors", item: "Energy Drink", qty: 12, unitRate: 85, method: "CASH", daysAgo: 6 },
+    { vendor: "Vishal Beverage Suppliers", item: "Masala Maggi", qty: 20, unitRate: 22, method: "CREDIT", daysAgo: 3 },
+  ];
+  for (const p of purchaseDefs) {
+    const purchasedAt = at(-p.daysAgo, 11);
+    const exists = await db.purchase.findFirst({
+      where: { vendorId: vendorIds[p.vendor], itemName: p.item, purchasedAt },
+    });
+    if (!exists) {
+      const item = await db.fnBItem.findUnique({ where: { name: p.item } });
+      await db.purchase.create({
+        data: {
+          vendorId: vendorIds[p.vendor],
+          itemName: p.item,
+          fnbItemId: item?.id ?? null,
+          qty: p.qty,
+          unitRate: p.unitRate,
+          total: Math.round(p.qty * p.unitRate),
+          method: p.method,
+          purchasedAt,
+          note: "Opening stock-in",
+        },
+      });
+      if (item) {
+        await db.fnBItem.update({ where: { id: item.id }, data: { stock: { increment: p.qty } } });
+      }
+    }
+  }
+
+  // Aarav carries bonus minutes so Start Session can demo bonus consumption
+  await db.customer.update({
+    where: { phone: "9876500001" },
+    data: { bonusMinutes: Math.max(45, (await db.customer.findUnique({ where: { phone: "9876500001" } }))?.bonusMinutes ?? 45) },
+  });
+
+  // ---------- Shifts (closed history + one open) ----------
+  // Auto-close a stale open shift (opened before today) so the demo always shows history.
+  const todayStart = startOfDay(new Date());
+  const staleOpen = await db.shift.findFirst({ where: { closedAt: null, openedAt: { lt: todayStart } } });
+  if (staleOpen) {
+    const [cashAgg, rechgAgg, fnbAgg] = await Promise.all([
+      db.payment.aggregate({ _sum: { amount: true }, where: { method: "CASH", createdAt: { gte: staleOpen.openedAt, lte: todayStart } } }),
+      db.walletTxn.aggregate({ _sum: { amount: true }, where: { type: "RECHARGE", createdAt: { gte: staleOpen.openedAt, lte: todayStart } } }),
+      db.fnBOrder.aggregate({ _sum: { total: true }, where: { sessionId: null, status: "PAID", createdAt: { gte: staleOpen.openedAt, lte: todayStart } } }),
+    ]);
+    const staleSystemTotal = Math.round((cashAgg._sum.amount ?? 0) + (rechgAgg._sum.amount ?? 0) + (fnbAgg._sum.total ?? 0));
+    await db.shift.update({
+      where: { id: staleOpen.id },
+      data: {
+        closedAt: todayStart,
+        closingCash: staleOpen.openingCash + staleSystemTotal + 25, // small counted variance for the demo
+        systemTotal: staleOpen.openingCash + staleSystemTotal,
+        note: (staleOpen.note ?? "") + " · auto-closed (carried over midnight)",
+      },
+    });
+  }
+
+  // Seeded CLOSED shifts — OPENING / COUNTED / SYSTEM / DIFFERENCE rows for the history table
+  const closedShiftDefs = [
+    { staffName: "Ravi (Counter Staff)", dayOffset: -1, openingCash: 2000, systemTotal: 2860, countedCash: 2875, note: "Evening rush — ₹15 over in the cash drawer" },
+    { staffName: "Meera (Counter Staff)", dayOffset: -2, openingCash: 2000, systemTotal: 2410, countedCash: 2410, note: "Clean close — drawer matched system" },
+    { staffName: "Ravi (Counter Staff)", dayOffset: -3, openingCash: 2000, systemTotal: 3125, countedCash: 3090, note: "₹35 short — one UPI was marked as cash" },
+  ];
+  for (const s of closedShiftDefs) {
+    const openedAt = at(s.dayOffset, 10);
+    const exists = await db.shift.findFirst({ where: { staffName: s.staffName, openedAt } });
+    if (!exists) {
+      await db.shift.create({
+        data: {
+          staffName: s.staffName,
+          openedAt,
+          closedAt: at(s.dayOffset, 22),
+          openingCash: s.openingCash,
+          closingCash: s.countedCash,
+          systemTotal: s.systemTotal,
+          note: s.note,
+        },
+      });
+    }
+  }
+
   // ---------- Open shift ----------
   const openShift = await db.shift.findFirst({ where: { closedAt: null } });
   if (!openShift) {

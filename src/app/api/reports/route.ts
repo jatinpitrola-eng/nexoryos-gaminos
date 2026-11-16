@@ -158,6 +158,21 @@ export async function GET(req: Request) {
       select: { title: true, category: true, amount: true, date: true },
     });
     const expensesTotal = expenses.reduce((sum, x) => sum + x.amount, 0);
+
+    const purchases = await db.purchase.findMany({
+      where: { purchasedAt: { gte: from, lte: to } },
+      orderBy: { purchasedAt: "desc" },
+      select: {
+        itemName: true,
+        qty: true,
+        total: true,
+        method: true,
+        purchasedAt: true,
+        vendor: { select: { name: true } },
+      },
+    });
+    const purchasesTotal = purchases.reduce((sum, x) => sum + x.total, 0);
+
     const periodRevenue = gamingTotal + fnbSessionTotal + fnbStandaloneTotal + membershipsTotal;
 
     return NextResponse.json({
@@ -174,8 +189,17 @@ export async function GET(req: Request) {
         total: Math.round(gamingTotal + fnbSessionTotal + fnbStandaloneTotal + membershipsTotal),
       },
       expensesTotal: Math.round(expensesTotal),
-      netProfit: Math.round(periodRevenue - expensesTotal),
+      purchasesTotal: Math.round(purchasesTotal),
+      netProfit: Math.round(periodRevenue - expensesTotal - purchasesTotal),
       expenses,
+      purchases: purchases.map((p) => ({
+        itemName: p.itemName,
+        qty: p.qty,
+        total: Math.round(p.total),
+        method: p.method,
+        purchasedAt: p.purchasedAt,
+        vendorName: p.vendor.name,
+      })),
     });
   } catch (e) {
     return serverError(e);

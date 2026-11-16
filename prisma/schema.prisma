@@ -69,6 +69,7 @@ model Customer {
   email         String?
   walletBalance Float    @default(0)
   loyaltyPoints Int      @default(0)
+  bonusMinutes  Int      @default(0) // free play minutes credited by recharges/memberships
   createdAt     DateTime @default(now())
 
   memberships  Membership[]
@@ -116,6 +117,8 @@ model Session {
   pausedMinutes Int       @default(0) // accumulated pause time, subtracted from billable minutes
   pausedAt      DateTime? // set while status = PAUSED
   rateSnapshot  Float // hourly rate applied at start
+  rateRule      String? // pricing rule name applied at start (e.g. "Student Special (PC)")
+  bonusMinutesUsed Int    @default(0) // bonus minutes committed to this session
   stationFee    Float     @default(0)
   fnbTotal      Float     @default(0)
   discount      Float     @default(0)
@@ -217,6 +220,36 @@ model Expense {
   category String // RENT | SALARY | ELECTRICITY | INTERNET | OTHER
   amount   Float
   date     DateTime
+
+  createdAt DateTime @default(now())
+}
+
+// ---------- Vendors / Purchases ----------
+
+model Vendor {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  gstin     String?
+  notes     String?
+  purchases Purchase[]
+
+  createdAt DateTime @default(now())
+}
+
+model Purchase {
+  id          String   @id @default(cuid())
+  vendorId    String
+  itemName    String
+  fnbItemId   String? // linked F&B menu item — purchase raises its stock
+  qty         Int
+  unitRate    Float
+  total       Float
+  method      String   @default("CASH") // CASH | UPI | CARD | CREDIT
+  note        String?
+  purchasedAt DateTime @default(now())
+
+  vendor    Vendor @relation(fields: [vendorId], references: [id])
 
   createdAt DateTime @default(now())
 }

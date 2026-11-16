@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireSession, badRequest, serverError } from "@/lib/guards";
+import { resolveRateFromRules } from "@/lib/pricing";
 import type { FloorStation } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -10,26 +11,40 @@ export async function GET() {
     const g = await requireSession();
     if (!g.ok) return g.res;
 
-    const stations = await db.station.findMany({
-      where: { isActive: true },
-      orderBy: { name: "asc" },
-      include: {
-        sessions: {
-          where: { status: { in: ["ACTIVE", "PAUSED"] } },
-          include: { customer: { select: { name: true, phone: true } } },
-          take: 1,
+    const [stations, rules] = await Promise.all([
+      db.station.findMany({
+        where: { isActive: true },
+        orderBy: { name: "asc" },
+        include: {
+          sessions: {
+            where: { status: { in: ["ACTIVE", "PAUSED"] } },
+            include: { customer: { select: { name: true, phone: true } } },
+            take: 1,
+          },
         },
-      },
-    });
+      }),
+      db.pricingRule.findMany({ where: { isActive: true } }),
+    ]);
+
+    const now = new Date();
 
     const payload: FloorStation[] = stations.map((s) => {
       const active = s.sessions[0];
+      const resolved = resolveRateFromRules(
+        rules.filter((r) => r.stationType === s.type),
+        s.type,
+        s.hourlyRate,
+        now
+      );
       return {
         id: s.id,
         name: s.name,
         type: s.type as FloorStation["type"],
         status: s.status as FloorStation["status"],
         hourlyRate: s.hourlyRate,
+        effectiveRate: resolved.rate,
+        effectiveRuleName: resolved.ruleName,
+        effectiveKind: resolved.kind,
         activeSession: active
           ? {
               id: active.id,

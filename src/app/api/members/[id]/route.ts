@@ -33,6 +33,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         email: customer.email,
         walletBalance: customer.walletBalance,
         loyaltyPoints: customer.loyaltyPoints,
+        bonusMinutes: customer.bonusMinutes,
         createdAt: customer.createdAt,
       },
       txns: customer.walletTxns.map((t) => ({

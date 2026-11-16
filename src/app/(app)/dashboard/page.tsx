@@ -124,7 +124,7 @@ export default function DashboardPage() {
             ) : null}
           </GlassCard>
 
-          <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
             {/* Floor view */}
             <section aria-label="Live floor view" className="space-y-3">
               <div className="flex items-center justify-between">
@@ -194,7 +194,13 @@ function StationTile({ station }: { station: FloorStation }) {
         <span className={"inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider " + style.badge}>
           {station.type}
         </span>
-        <span className="text-[10px] text-muted-foreground">₹{station.hourlyRate}/hr</span>
+        {station.effectiveRuleName && station.effectiveRate != null && station.effectiveRate !== station.hourlyRate ? (
+          <span className="truncate text-[10px] font-semibold text-emerald-300" title={`${station.effectiveRuleName} — base ₹${station.hourlyRate}/hr`}>
+            ₹{station.effectiveRate}/hr · {station.effectiveRuleName}
+          </span>
+        ) : (
+          <span className="text-[10px] text-muted-foreground">₹{station.hourlyRate}/hr</span>
+        )}
       </div>
       {station.activeSession ? (
         <div className="mt-2.5 space-y-1 border-t border-white/5 pt-2.5">

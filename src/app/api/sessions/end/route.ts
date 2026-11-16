@@ -42,7 +42,15 @@ export async function POST(req: Request) {
       (session.status === "PAUSED" && session.pausedAt
         ? Math.max(0, Math.round((endedAt.getTime() - session.pausedAt.getTime()) / 60000))
         : 0);
-    const { minutes, fee } = computeStationFeeWithPause(session.rateSnapshot, session.startedAt, endedAt, pausedTotal);
+    const { minutes, fee, bonusUsed } = computeStationFeeWithPause(
+      session.rateSnapshot,
+      session.startedAt,
+      endedAt,
+      pausedTotal,
+      session.bonusMinutesUsed
+    );
+    // Bonus minutes committed but not actually played → credit back to the wallet of minutes
+    const bonusRefund = Math.max(0, session.bonusMinutesUsed - bonusUsed);
     const fnbTotal = session.fnbOrders.reduce((s, o) => s + o.total, 0);
     const maxDiscount = fee + fnbTotal;
     const safeDiscount = Math.min(discount, maxDiscount);
@@ -86,12 +94,20 @@ export async function POST(req: Request) {
         data: {
           endedAt,
           stationFee: fee,
+          bonusMinutesUsed: bonusUsed,
           fnbTotal: Math.round(fnbTotal),
           discount: safeDiscount,
           total,
           status: "COMPLETED",
         },
       });
+
+      if (bonusRefund > 0 && session.customer) {
+        await tx.customer.update({
+          where: { id: session.customer.id },
+          data: { bonusMinutes: { increment: bonusRefund } },
+        });
+      }
 
       for (const p of payments) {
         await tx.payment.create({
@@ -138,6 +154,8 @@ export async function POST(req: Request) {
       bill: {
         minutes,
         fee,
+        bonusUsed,
+        bonusRefund,
         fnbTotal: Math.round(fnbTotal),
         discount: safeDiscount,
         total,

@@ -123,7 +123,7 @@ export default function ShiftsPage() {
         <GlassCard className="p-5 sm:p-6">
           <p className="font-display text-base font-semibold">No open shift</p>
           <p className="mt-1 text-sm text-muted-foreground">Open a shift at the counter start — cash is tracked till close.</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor="sh-staff">Staff name</Label>
               <Input id="sh-staff" value={staffName} onChange={(e) => setStaffName(e.target.value)} placeholder="e.g. Ravi" className="border-violet-500/25 bg-white/5" />

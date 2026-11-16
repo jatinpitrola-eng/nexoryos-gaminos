@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   BadgeIndianRupee,
   Loader2,
@@ -43,6 +44,7 @@ interface CustomerLite {
   phone: string;
   walletBalance: number;
   loyaltyPoints: number;
+  bonusMinutes?: number;
 }
 
 interface OrderLine {
@@ -59,6 +61,9 @@ interface SessionDetail {
     endedAt: string | null;
     status: string;
     rateSnapshot: number;
+    rateRule?: string | null;
+    pausedMinutes?: number;
+    bonusMinutesUsed?: number;
     station: { id: string; name: string; type: string; hourlyRate: number };
     customer: { id: string; name: string; phone: string; walletBalance: number; loyaltyPoints: number } | null;
     orders: OrderLine[];
@@ -233,7 +238,11 @@ function StationCard({
             <span className={"inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider " + style.badge}>
               {style.label}
             </span>
-            <span className="text-xs text-muted-foreground">₹{station.hourlyRate}/hr</span>
+            {station.effectiveRuleName && station.effectiveRate != null && station.effectiveRate !== station.hourlyRate ? (
+              <span className="text-xs font-semibold text-emerald-300">₹{station.effectiveRate}/hr · {station.effectiveRuleName}</span>
+            ) : (
+              <span className="text-xs text-muted-foreground">₹{station.hourlyRate}/hr</span>
+            )}
           </div>
         </div>
         <StatusDot state={station.status} pulse={station.status === "BUSY"} />
@@ -343,6 +352,7 @@ function StartSessionDialog({
   const [name, setName] = React.useState("");
   const [phone, setPhone] = React.useState("");
   const [planned, setPlanned] = React.useState("");
+  const [useBonus, setUseBonus] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
@@ -354,6 +364,7 @@ function StartSessionDialog({
     setName("");
     setPhone("");
     setPlanned("");
+    setUseBonus(false);
   }, [station]);
 
   React.useEffect(() => {
@@ -377,8 +388,12 @@ function StartSessionDialog({
     try {
       const body: Record<string, unknown> = { stationId: station.id };
       if (planned && Number(planned) > 0) body.plannedMinutes = Number(planned);
-      if (tab === "existing" && selected) body.customerId = selected.id;
-      else if (tab === "new") body.quickCustomer = { name, phone };
+      if (tab === "existing" && selected) {
+        body.customerId = selected.id;
+        if (useBonus && (selected.bonusMinutes ?? 0) > 0) {
+          body.useBonusMinutes = Math.min(selected.bonusMinutes!, planned && Number(planned) > 0 ? Number(planned) : selected.bonusMinutes!);
+        }
+      } else if (tab === "new") body.quickCustomer = { name, phone };
 
       const res = await fetch("/api/sessions", {
         method: "POST",
@@ -387,8 +402,11 @@ function StartSessionDialog({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || "Could not start session");
+      const rateLine = json.rate?.ruleName
+        ? `Rate ${formatINR(json.rate.rate)}/hr — ${json.rate.ruleName}`
+        : `Rate ${formatINR(json.rate?.rate ?? station.hourlyRate)}/hr`;
       toast.success(`${station.name} started for ${(json.session?.customer?.name as string) || "guest"}`, {
-        description: json.rate?.ruleName ? `Rate ${formatINR(json.rate.rate)}/hr — ${json.rate.ruleName}` : `Rate ${formatINR(json.rate?.rate ?? station.hourlyRate)}/hr`,
+        description: json.bonusUsed > 0 ? `${rateLine} · ${json.bonusUsed} bonus minutes consumed` : rateLine,
       });
       onStarted();
     } catch (e) {
@@ -406,7 +424,11 @@ function StartSessionDialog({
         <DialogHeader>
           <DialogTitle className="font-display">Start Session — {station?.name}</DialogTitle>
           <DialogDescription>
-            {station ? `${TYPE_STYLES[station.type].label} · ${formatINR(station.hourlyRate)}/hr base rate` : ""}
+            {station
+              ? station.effectiveRuleName && station.effectiveRate != null && station.effectiveRate !== station.hourlyRate
+                ? `${TYPE_STYLES[station.type].label} · ${formatINR(station.effectiveRate)}/hr — ${station.effectiveRuleName} (base ${formatINR(station.hourlyRate)}/hr)`
+                : `${TYPE_STYLES[station.type].label} · ${formatINR(station.hourlyRate)}/hr base rate`
+              : ""}
           </DialogDescription>
         </DialogHeader>
 
@@ -435,7 +457,10 @@ function StartSessionDialog({
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => setSelected(c)}
+                    onClick={() => {
+                      setSelected(c);
+                      setUseBonus(false);
+                    }}
                     className={
                       "flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors " +
                       (selected?.id === c.id
@@ -449,12 +474,34 @@ function StartSessionDialog({
                     </span>
                     <span className="text-right">
                       <span className="block text-xs text-amber-300">{formatINR(c.walletBalance)}</span>
-                      <span className="block text-[10px] text-violet-300">{c.loyaltyPoints} pts</span>
+                      <span className="block text-[10px] text-violet-300">
+                        {c.loyaltyPoints} pts{(c.bonusMinutes ?? 0) > 0 ? ` · ${c.bonusMinutes} bonus` : ""}
+                      </span>
                     </span>
                   </button>
                 ))
               )}
             </div>
+            {selected && (selected.bonusMinutes ?? 0) > 0 ? (
+              <label
+                className={cn(
+                  "flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition-colors",
+                  useBonus ? "border-cyan-500/50 bg-cyan-500/10" : "border-white/10 bg-white/[0.03]"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={useBonus}
+                  onChange={(e) => setUseBonus(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-cyan-500"
+                  aria-label="Use bonus minutes"
+                />
+                <span className="text-sm">
+                  <span className="font-semibold text-cyan-300">Use {selected.bonusMinutes} bonus minutes</span>
+                  <span className="block text-xs text-muted-foreground">Free play time is consumed first — remaining minutes bill normally.</span>
+                </span>
+              </label>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-3">
@@ -531,7 +578,9 @@ function BillDialog({
   const liveMinutes = detail
     ? Math.max(1, Math.ceil(((detail.session.endedAt ? new Date(detail.session.endedAt).getTime() : now) - new Date(detail.session.startedAt).getTime()) / 60000))
     : 0;
-  const liveFee = detail ? Math.round((detail.session.rateSnapshot * liveMinutes) / 60) : 0;
+  const liveBillable = detail ? Math.max(1, liveMinutes - (detail.session.pausedMinutes ?? 0)) : 0;
+  const liveBonusUsed = detail ? Math.min(detail.session.bonusMinutesUsed ?? 0, liveBillable) : 0;
+  const liveFee = detail ? Math.round((detail.session.rateSnapshot * (liveBillable - liveBonusUsed)) / 60) : 0;
   const fnbTotal = detail ? detail.session.orders.reduce((s, o) => s + o.total, 0) : 0;
   const discountNum = Math.min(Number(discount) || 0, liveFee + fnbTotal);
   const due = Math.max(0, Math.round(liveFee + fnbTotal - discountNum));
@@ -592,9 +641,20 @@ function BillDialog({
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bill lines</p>
               <div className="flex items-center justify-between text-sm">
                 <span>
-                  {detail.session.station.name} · {liveMinutes} min × {formatINR(detail.session.rateSnapshot)}/hr
+                  {detail.session.station.name} · {liveBillable - liveBonusUsed} min × {formatINR(detail.session.rateSnapshot)}/hr
+                  {liveBonusUsed > 0 ? ` · ${liveBonusUsed} bonus min free` : ""}
                 </span>
                 <span className="tabular font-semibold">{formatINR(liveFee)}</span>
+              </div>
+              <div className="mt-1.5 flex items-center gap-2">
+                {detail.session.rateRule ? (
+                  <Badge className="border-emerald-500/40 bg-emerald-500/10 text-[10px] text-emerald-300">{detail.session.rateRule}</Badge>
+                ) : (
+                  <Badge variant="outline" className="border-white/15 text-[10px]">Base rate</Badge>
+                )}
+                <Link href="/pricing" className="text-[10px] text-cyan-300 underline-offset-2 hover:underline">
+                  See why this rate
+                </Link>
               </div>
               {detail.session.orders.flatMap((o) =>
                 o.items.map((it, i) => (

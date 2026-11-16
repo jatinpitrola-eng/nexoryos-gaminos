@@ -15,6 +15,8 @@ const PROTECTED = [
   "/settings",
   "/tournaments",
   "/expenses",
+  "/vendors",
+  "/purchases",
 ];
 const OWNER_ONLY = ["/reports", "/pricing", "/settings", "/expenses"];
 const AUTH_PAGES = ["/login", "/signup"];

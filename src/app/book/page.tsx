@@ -246,16 +246,16 @@ export default function PublicBookingPage() {
                 </Button>
               </GlassCard>
             ) : !avail ? (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Skeleton className="h-32 rounded-2xl bg-white/5" />
                 <Skeleton className="h-32 rounded-2xl bg-white/5" />
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 min-w-0 gap-3 sm:grid-cols-2">
                 {avail.types.map((t) => {
                   const meta = TYPE_STYLES[t.type as keyof typeof TYPE_STYLES];
                   return (
-                    <GlassCard key={t.type} variant="cyan" className="p-4">
+                    <GlassCard key={t.type} variant="cyan" className="min-w-0 p-4">
                       <div className="flex items-center justify-between gap-2">
                         <div>
                           <p className="font-display text-sm font-bold">{meta?.label ?? t.type}</p>
@@ -265,7 +265,7 @@ export default function PublicBookingPage() {
                           {t.type}
                         </span>
                       </div>
-                      <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 scroll-neon">
+                      <div className="mt-3 flex min-w-0 gap-1.5 overflow-x-auto pb-1 scroll-neon">
                         {t.hours.map((hh) => {
                           const open = hh.available > 0;
                           return (

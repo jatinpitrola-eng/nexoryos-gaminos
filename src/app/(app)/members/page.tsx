@@ -35,6 +35,7 @@ interface CustomerLite {
   email: string | null;
   walletBalance: number;
   loyaltyPoints: number;
+  bonusMinutes: number;
   membershipsCount: number;
 }
 
@@ -144,14 +145,19 @@ export default function MembersPage() {
                     <Badge className="border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-300"><Sparkles className="mr-1 h-3 w-3" />Member</Badge>
                   ) : null}
                 </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300">
-                    <Wallet className="h-3.5 w-3.5" /> {formatINR(c.walletBalance)}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300">
+                  <Wallet className="h-3.5 w-3.5" /> {formatINR(c.walletBalance)}
+                </span>
+                <span className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs font-semibold text-violet-300">
+                  {c.loyaltyPoints} pts
+                </span>
+                {c.bonusMinutes > 0 ? (
+                  <span className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-xs font-semibold text-cyan-300">
+                    {c.bonusMinutes} bonus min
                   </span>
-                  <span className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs font-semibold text-violet-300">
-                    {c.loyaltyPoints} pts
-                  </span>
-                </div>
+                ) : null}
+              </div>
               </GlassCard>
             </button>
           ))}
@@ -178,7 +184,8 @@ function AddCustomerDialog({ open, onClose, onCreated }: { open: boolean; onClos
     }
   }, [open]);
 
-  async function save() {
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
     setBusy(true);
     try {
       const res = await fetch("/api/members", {
@@ -204,7 +211,7 @@ function AddCustomerDialog({ open, onClose, onCreated }: { open: boolean; onClos
           <DialogTitle className="font-display">Add Customer</DialogTitle>
           <DialogDescription>Phone is the member ID — used for search & wallet.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <form onSubmit={save} className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="mc-name">Name</Label>
             <Input id="mc-name" value={name} onChange={(e) => setName(e.target.value)} className="border-violet-500/25 bg-white/5" />
@@ -217,10 +224,10 @@ function AddCustomerDialog({ open, onClose, onCreated }: { open: boolean; onClos
             <Label htmlFor="mc-email">Email (optional)</Label>
             <Input id="mc-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="border-violet-500/25 bg-white/5" />
           </div>
-          <Button onClick={save} disabled={busy || !name.trim() || phone.replace(/\D/g, "").length < 10} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
+          <Button type="submit" disabled={busy || !name.trim() || phone.replace(/\D/g, "").length < 10} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />} Add Customer
           </Button>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
@@ -276,6 +283,11 @@ function MemberDrawer({ id, onClose, onChanged }: { id: string | null; onClose: 
                   <p className="font-display text-xl font-bold text-violet-300">{detail.customer.loyaltyPoints} pts</p>
                 </div>
               </div>
+              {detail.customer.bonusMinutes > 0 ? (
+                <p className="mt-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-300">
+                  {detail.customer.bonusMinutes} bonus minutes available — use them when starting a session
+                </p>
+              ) : null}
               <div className="mt-3 flex gap-2">
                 <Button size="sm" className="flex-1 bg-gradient-to-r from-violet-600 to-cyan-500 text-white hover:opacity-90" onClick={() => setRechargeOpen(true)}>
                   <Wallet className="mr-1.5 h-3.5 w-3.5" /> Recharge
@@ -406,7 +418,8 @@ function RechargeDialog({ id, open, onClose, onDone }: { id: string | null; open
     }
   }, [open]);
 
-  async function submit() {
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
     setBusy(true);
     try {
       const res = await fetch("/api/members/recharge", {
@@ -418,7 +431,12 @@ function RechargeDialog({ id, open, onClose, onDone }: { id: string | null; open
       if (!res.ok) throw new Error(json.error || "Recharge failed");
       toast.success(
         `Wallet recharged — ${formatINR(json.customer?.walletBalance ?? 0)} balance`,
-        { description: Number(bonus) > 0 ? `${bonus} bonus minutes credited` : undefined }
+        {
+          description:
+            Number(bonus) > 0
+              ? `${bonus} bonus minutes credited — total ${json.customer?.bonusMinutes ?? 0} min available`
+              : undefined,
+        }
       );
       onDone();
     } catch (e) {
@@ -435,13 +453,13 @@ function RechargeDialog({ id, open, onClose, onDone }: { id: string | null; open
           <DialogTitle className="font-display">Recharge Wallet</DialogTitle>
           <DialogDescription>Bonus minutes are free play minutes — not wallet money.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <form onSubmit={submit} className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="rc-amount">Amount (₹)</Label>
             <Input id="rc-amount" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))} placeholder="500" inputMode="decimal" className="border-violet-500/25 bg-white/5" />
             <div className="flex gap-1.5">
               {[100, 200, 500, 1000].map((v) => (
-                <Button key={v} size="sm" variant="outline" className="h-7 border-violet-500/30 text-xs" onClick={() => setAmount(String(v))}>₹{v}</Button>
+                <Button key={v} type="button" size="sm" variant="outline" className="h-7 border-violet-500/30 text-xs" onClick={() => setAmount(String(v))}>₹{v}</Button>
               ))}
             </div>
           </div>
@@ -450,7 +468,7 @@ function RechargeDialog({ id, open, onClose, onDone }: { id: string | null; open
             <Input id="rc-bonus" value={bonus} onChange={(e) => setBonus(e.target.value.replace(/\D/g, ""))} placeholder="0" inputMode="numeric" className="border-violet-500/25 bg-white/5" />
             <div className="flex gap-1.5">
               {[30, 60, 120].map((v) => (
-                <Button key={v} size="sm" variant="outline" className="h-7 border-cyan-500/30 text-xs" onClick={() => setBonus(String(v))}>{v} min</Button>
+                <Button key={v} type="button" size="sm" variant="outline" className="h-7 border-cyan-500/30 text-xs" onClick={() => setBonus(String(v))}>{v} min</Button>
               ))}
             </div>
           </div>
@@ -463,10 +481,10 @@ function RechargeDialog({ id, open, onClose, onDone }: { id: string | null; open
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={submit} disabled={busy || !(Number(amount) > 0)} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
+          <Button type="submit" disabled={busy || !(Number(amount) > 0)} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Recharge
           </Button>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
@@ -501,7 +519,8 @@ function MembershipDialog({ id, open, onClose, onDone }: { id: string | null; op
     }
   }
 
-  async function submit() {
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
     setBusy(true);
     try {
       const res = await fetch("/api/membership", {
@@ -534,7 +553,7 @@ function MembershipDialog({ id, open, onClose, onDone }: { id: string | null; op
           <DialogTitle className="font-display">Attach Membership</DialogTitle>
           <DialogDescription>Starts today, expires after the selected months.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <form onSubmit={submit} className="space-y-3">
           <div className="space-y-1.5">
             <Label>Tier preset</Label>
             <Select value={tier} onValueChange={applyTier}>
@@ -570,10 +589,10 @@ function MembershipDialog({ id, open, onClose, onDone }: { id: string | null; op
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={submit} disabled={busy || !planName.trim() || !(Number(price) > 0)} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
+          <Button type="submit" disabled={busy || !planName.trim() || !(Number(price) > 0)} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Attach Membership
           </Button>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

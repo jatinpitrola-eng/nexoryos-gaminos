@@ -168,7 +168,14 @@ export default function BookingsPage() {
   }
 
   function whatsappConfirmText(b: Booking): string {
-    return `Hi ${b.customerName}! Your booking ${b.code} at ${zoneName || "our gaming zone"} is confirmed — ${b.stationName} on ${fmtDate(b.slotStart)} ${fmtTime(b.slotStart)}–${fmtTime(b.slotEnd)}. See you!`;
+    return [
+      `Hi ${b.customerName}! Your booking at ${zoneName || "our gaming zone"} is confirmed:`,
+      `\u{1F3AE} Station: ${b.stationName} (${TYPE_STYLES[b.stationType as keyof typeof TYPE_STYLES]?.label ?? b.stationType})`,
+      `\u{1F4C5} ${fmtDate(b.slotStart)} · ${fmtTime(b.slotStart)} – ${fmtTime(b.slotEnd)}`,
+      `\u{1F511} Booking code: ${b.code}`,
+      `\u{1F4B0} Deposit: ${formatINR(b.depositAmount)} (${b.depositPaid ? "received" : "pay at counter"})`,
+      `Show this code at the counter. See you soon!`,
+    ].join("\n");
   }
 
   function copy(text: string, label: string) {
@@ -183,9 +190,12 @@ export default function BookingsPage() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-xl font-bold sm:text-2xl">Bookings</h1>
-          <p className="text-sm text-muted-foreground">Hourly slots, deposits & check-ins</p>
+          <p className="text-xs text-muted-foreground">
+            Hourly slots, deposits &amp; check-ins. <span className="text-emerald-300">Confirm on WhatsApp</span> opens wa.me pre-filled with the zone
+            name, booking code, station &amp; slot — staff just review and hit send.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="icon" className="border-violet-500/30" onClick={() => shiftDate(-1)} aria-label="Previous day">
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -220,7 +230,7 @@ export default function BookingsPage() {
             No open bookings for this day. Free cells in the calendar below can take walk-in phone bookings.
           </GlassCard>
         ) : (
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {upcoming.map((b) => {
               const start = new Date(b.slotStart);
               const isUpcoming = start.getTime() >= now.getTime();
@@ -275,13 +285,14 @@ export default function BookingsPage() {
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2 border-t border-white/5 pt-3">
-                    {b.notify && b.customerPhone && (
+                    {b.customerPhone && (
                       <a
                         href={`https://wa.me/91${b.customerPhone}?text=${encodeURIComponent(whatsappConfirmText(b))}`}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex h-9 items-center rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 text-sm font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20"
                         aria-label={`Send WhatsApp confirmation to ${b.customerName}`}
+                        title="Opens WhatsApp with the zone name, booking code, station & slot pre-filled"
                       >
                         <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Confirm on WhatsApp
                       </a>
@@ -500,7 +511,8 @@ function CreateBookingDialog({
 
   const canSubmit = stationId && customer && !conflict;
 
-  async function submit() {
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
     setBusy(true);
     try {
       const res = await fetch("/api/bookings", {
@@ -537,7 +549,7 @@ function CreateBookingDialog({
           <DialogDescription>Hold the slot with a deposit to dodge no-shows.</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
             <Label>Station</Label>
             <Select value={stationId} onValueChange={(v) => {
@@ -641,11 +653,11 @@ function CreateBookingDialog({
             <Switch id="bk-paid" checked={depositPaid} onCheckedChange={setDepositPaid} />
           </div>
 
-          <Button onClick={submit} disabled={!canSubmit || busy} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
+          <Button type="submit" disabled={!canSubmit || busy} className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90">
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarDays className="mr-2 h-4 w-4" />}
             {busy ? "Booking…" : "Create Booking"}
           </Button>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

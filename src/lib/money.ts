@@ -29,19 +29,22 @@ export function computeStationFee(ratePerHour: number, startedAt: Date, endedAt:
 }
 
 /**
- * Pause-aware fee: total elapsed minutes minus accumulated paused minutes.
- * Used for sessions with Pause/Resume (Pro feature).
+ * Pause-aware fee: total elapsed minutes minus accumulated paused minutes
+ * and any committed bonus (free-play) minutes.
+ * Used for sessions with Pause/Resume and bonus-minute sessions.
  */
 export function computeStationFeeWithPause(
   ratePerHour: number,
   startedAt: Date,
   endedAt: Date,
-  pausedMinutes: number
-): FeeBreakdown {
+  pausedMinutes: number = 0,
+  bonusMinutesUsed: number = 0
+): FeeBreakdown & { bonusUsed: number } {
   const base = computeStationFee(ratePerHour, startedAt, endedAt);
-  const minutes = Math.max(1, base.minutes - Math.max(0, Math.floor(pausedMinutes)));
-  const fee = Math.round((ratePerHour * minutes) / 60);
-  return { minutes, fee };
+  const billable = Math.max(1, base.minutes - Math.max(0, Math.floor(pausedMinutes)));
+  const bonusUsed = Math.min(Math.max(0, Math.floor(bonusMinutesUsed)), billable);
+  const fee = Math.round((ratePerHour * (billable - bonusUsed)) / 60);
+  return { minutes: billable, fee, bonusUsed };
 }
 
 /** Loyalty: every ₹100 spent = 1 point */

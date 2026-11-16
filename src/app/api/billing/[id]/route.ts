@@ -29,6 +29,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         endedAt: session.endedAt,
         status: session.status,
         rateSnapshot: session.rateSnapshot,
+        rateRule: session.rateRule,
+        bonusMinutesUsed: session.bonusMinutesUsed,
         stationFee: session.stationFee,
         fnbTotal: session.fnbTotal,
         discount: session.discount,

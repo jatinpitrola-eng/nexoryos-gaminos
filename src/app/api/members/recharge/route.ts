@@ -32,7 +32,14 @@ export async function POST(req: Request) {
       const recharge = await tx.walletTxn.create({
         data: { customerId, amount, type: "RECHARGE", note },
       });
-      await tx.customer.update({ where: { id: customerId }, data: { walletBalance: { increment: amount } } });
+      await tx.customer.update({
+        where: { id: customerId },
+        data: {
+          walletBalance: { increment: amount },
+          // Bonus minutes persist on the customer so Start Session can consume them
+          ...(bonusMinutes > 0 ? { bonusMinutes: { increment: bonusMinutes } } : {}),
+        },
+      });
 
       const bonus =
         bonusMinutes > 0
@@ -45,7 +52,7 @@ export async function POST(req: Request) {
 
     const updated = await db.customer.findUnique({
       where: { id: customerId },
-      select: { id: true, name: true, walletBalance: true, loyaltyPoints: true },
+      select: { id: true, name: true, walletBalance: true, loyaltyPoints: true, bonusMinutes: true },
     });
 
     return NextResponse.json({

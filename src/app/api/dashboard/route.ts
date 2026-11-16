@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireSession, serverError } from "@/lib/guards";
 import { getZoneSettings } from "@/lib/settings";
 import { startOfDay, endOfDay, addDays, minutesOverlap } from "@/lib/hours";
+import { resolveRateFromRules } from "@/lib/pricing";
 import type { DashboardPayload, FloorStation } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -55,6 +56,7 @@ export async function GET() {
       where: { startedAt: { gte: todayStart, lte: todayEnd }, status: { not: "CANCELLED" } },
       select: { startedAt: true, endedAt: true, status: true },
     });
+    const pricingRules = await db.pricingRule.findMany({ where: { isActive: true } });
 
     const standaloneToday = standaloneOrders
       .filter((o) => o.createdAt >= todayStart && o.createdAt <= todayEnd)
@@ -66,12 +68,21 @@ export async function GET() {
 
     const floor: FloorStation[] = stations.map((s) => {
       const active = s.sessions[0];
+      const resolved = resolveRateFromRules(
+        pricingRules.filter((r) => r.stationType === s.type),
+        s.type,
+        s.hourlyRate,
+        now
+      );
       return {
         id: s.id,
         name: s.name,
         type: s.type as FloorStation["type"],
         status: s.status as FloorStation["status"],
         hourlyRate: s.hourlyRate,
+        effectiveRate: resolved.rate,
+        effectiveRuleName: resolved.ruleName,
+        effectiveKind: resolved.kind,
         activeSession: active
           ? {
               id: active.id,

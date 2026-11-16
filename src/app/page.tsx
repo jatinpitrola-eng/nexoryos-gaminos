@@ -13,6 +13,7 @@ import {
   Trophy,
   Wallet,
   Zap,
+  LogIn,
 } from "lucide-react";
 import { Brand, NexoryosBadge } from "@/components/brand";
 import { GlassCard } from "@/components/glass-card";
@@ -164,13 +165,18 @@ export default function LandingPage() {
             <a href="#pricing" className="transition-colors hover:text-foreground">Pricing</a>
             <a href="#roadmap" className="transition-colors hover:text-foreground">Roadmap</a>
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
             <Link href="/login">
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">Log in</Button>
+              <Button variant="ghost" size="sm" className="h-9 px-2.5 text-muted-foreground hover:text-foreground sm:px-4">
+                <LogIn className="h-4 w-4" aria-hidden />
+                <span className="hidden sm:inline">Log in</span>
+                <span className="sr-only">Log in</span>
+              </Button>
             </Link>
             <Link href="/book">
-              <Button className="bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white shadow-[0_0_18px_rgba(139,92,246,0.35)] hover:opacity-90">
-                Book a PC Now
+              <Button size="sm" className="h-9 bg-gradient-to-r from-violet-600 to-cyan-500 px-3 font-semibold text-white shadow-[0_0_18px_rgba(139,92,246,0.35)] hover:opacity-90 sm:px-4">
+                <span className="sm:hidden">Book Now</span>
+                <span className="hidden sm:inline">Book a PC Now</span>
               </Button>
             </Link>
           </div>
@@ -214,11 +220,11 @@ export default function LandingPage() {
             </div>
 
             {/* Hero mock: live floor */}
-            <GlassCard className="relative p-5 sm:p-6" aria-hidden>
-              <div className="mb-4 flex items-center justify-between">
-                <p className="font-display text-sm font-semibold tracking-widest text-cyan-300">LIVE FLOOR VIEW</p>
-                <span className="flex items-center gap-1.5 text-xs text-emerald-300">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 dot-glow dot-pulse" /> 9 of 15 stations busy
+            <GlassCard className="relative min-w-0 p-5 sm:p-6" aria-hidden>
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <p className="font-display text-sm font-semibold tracking-widest text-cyan-300">FLOOR VIEW</p>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden /> demo zone preview · 9 of 15 busy
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -273,7 +279,7 @@ export default function LandingPage() {
           <div className="mx-auto max-w-7xl">
             <p className="font-display text-sm font-semibold tracking-[0.3em] text-violet-300">FEATURES</p>
             <h2 className="mt-2 font-display text-2xl font-bold sm:text-3xl">Everything your zone needs. Nothing it doesn&apos;t.</h2>
-            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map((f) => (
                 <GlassCard key={f.title} className="group p-6 transition-transform hover:-translate-y-1">
                   <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-3">
@@ -292,7 +298,7 @@ export default function LandingPage() {
           <div className="mx-auto max-w-7xl">
             <p className="font-display text-sm font-semibold tracking-[0.3em] text-cyan-300">PRICING</p>
             <h2 className="mt-2 font-display text-2xl font-bold sm:text-3xl">Simple plans. Pay from your first filled hour.</h2>
-            <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            <div className="mt-10 grid grid-cols-1 gap-5 lg:grid-cols-3">
               {PLANS.map((p) => (
                 <GlassCard
                   key={p.name}

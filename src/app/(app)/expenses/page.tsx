@@ -345,7 +345,8 @@ function AddExpenseDialog({
     }
   }, [open]);
 
-  async function save() {
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
     setBusy(true);
     try {
       const res = await fetch("/api/expenses", {
@@ -371,7 +372,7 @@ function AddExpenseDialog({
           <DialogTitle className="font-display">Add Expense</DialogTitle>
           <DialogDescription>Kharcha note karo — rent, salary, light bill ane bija.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <form onSubmit={save} className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="ex-title">Title</Label>
             <Input
@@ -415,13 +416,13 @@ function AddExpenseDialog({
             />
           </div>
           <Button
-            onClick={save}
+            type="submit"
             disabled={busy || title.trim().length < 2 || !(Number(amount) > 0) || !date}
             className="h-11 w-full bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold text-white hover:opacity-90"
           >
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />} Add Expense
           </Button>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

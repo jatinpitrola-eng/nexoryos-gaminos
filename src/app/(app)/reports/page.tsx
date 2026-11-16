@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Coffee, Download, Gamepad2, IndianRupee, Receipt, TrendingUp, Users } from "lucide-react";
+import { Coffee, Download, Gamepad2, IndianRupee, PackagePlus, Receipt, TrendingUp, Users } from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -52,7 +52,9 @@ interface ReportPayload {
   heatmap: { days: { date: string; label: string }[]; hours: number[]; cells: number[][] };
   split: { gaming: number; fnb: number; memberships: number; total: number };
   expensesTotal: number;
+  purchasesTotal: number;
   netProfit: number;
+  purchases: { itemName: string; qty: number; total: number; method: string; purchasedAt: string; vendorName: string }[];
 }
 
 export default function ReportsPage() {
@@ -151,12 +153,13 @@ export default function ReportsPage() {
             <StatCard title="Memberships" value={formatINR(data.split.memberships)} icon={Users} accent="cyan" sub="Plans sold" />
             <StatCard title="Total" value={formatINR(data.split.total)} icon={IndianRupee} accent="green" sub={`${fmtDate(data.from)} → ${fmtDate(data.to)}`} />
             <StatCard title="Expenses" value={formatINR(data.expensesTotal)} icon={Receipt} accent="amber" sub="Kharcha this period" />
+            <StatCard title="Purchases (Stock-in)" value={formatINR(data.purchasesTotal)} icon={PackagePlus} accent="cyan" sub="Vendor stock-in this period" />
             <StatCard
               title="Net Profit"
               value={`${data.netProfit < 0 ? "−" : ""}${formatINR(Math.abs(data.netProfit))}`}
               icon={TrendingUp}
               accent={data.netProfit >= 0 ? "green" : "red"}
-              sub="Revenue − expenses"
+              sub="Revenue − expenses − purchases"
             />
           </section>
 
@@ -182,7 +185,7 @@ export default function ReportsPage() {
             </div>
           </GlassCard>
 
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             {/* Station stats */}
             <GlassCard className="p-5">
               <h2 className="font-display text-base font-semibold tracking-wide">PER-STATION PERFORMANCE</h2>

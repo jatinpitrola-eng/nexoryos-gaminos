@@ -29,7 +29,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       (session.status === "PAUSED" && session.pausedAt
         ? Math.max(0, Math.round((now.getTime() - session.pausedAt.getTime()) / 60000))
         : 0);
-    const { minutes, fee } = computeStationFeeWithPause(session.rateSnapshot, session.startedAt, session.endedAt ?? now, pausedTotal);
+    const { minutes, fee, bonusUsed } = computeStationFeeWithPause(
+      session.rateSnapshot,
+      session.startedAt,
+      session.endedAt ?? now,
+      pausedTotal,
+      session.bonusMinutesUsed
+    );
 
     return NextResponse.json({
       session: {
@@ -38,6 +44,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         endedAt: session.endedAt,
         status: session.status,
         rateSnapshot: session.rateSnapshot,
+        rateRule: session.rateRule,
+        pausedMinutes: session.pausedMinutes,
+        bonusMinutesUsed: session.bonusMinutesUsed,
         stationFee: session.stationFee,
         fnbTotal: session.fnbTotal,
         discount: session.discount,
@@ -55,7 +64,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         }),
         payments: session.payments.map((p) => ({ amount: p.amount, method: p.method, createdAt: p.createdAt })),
       },
-      live: { minutes, fee },
+      live: { minutes, fee, bonusUsed },
     });
   } catch (e) {
     return serverError(e);

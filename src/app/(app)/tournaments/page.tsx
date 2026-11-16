@@ -633,12 +633,12 @@ function TournamentsView() {
 
       {tournaments === null ? (
         <>
-          <section aria-label="Loading stats" className="grid gap-4 sm:grid-cols-3">
+          <section aria-label="Loading stats" className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-28 rounded-2xl" />
             ))}
           </section>
-          <section aria-label="Loading tournaments" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <section aria-label="Loading tournaments" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-80 rounded-2xl" />
             ))}
@@ -646,7 +646,7 @@ function TournamentsView() {
         </>
       ) : (
         <>
-          <section aria-label="Tournament stats" className="grid gap-4 sm:grid-cols-3">
+          <section aria-label="Tournament stats" className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard title="Upcoming" value={stats.upcoming} icon={CalendarDays} accent="cyan" sub="events scheduled" />
             <StatCard
               title="Total prize pool"
@@ -678,7 +678,7 @@ function TournamentsView() {
               </Button>
             </GlassCard>
           ) : (
-            <section aria-label="Tournament list" className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <section aria-label="Tournament list" className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {tournaments.map(renderCard)}
             </section>
           )}
