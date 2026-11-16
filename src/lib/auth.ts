@@ -24,11 +24,11 @@ export const authOptions: NextAuthOptions = {
         const user = await db.user.findUnique({ where: { email } });
         if (!user) return null;
         if (!verifyPassword(password, user.passwordHash)) return null;
-        return { id: user.id, email: user.email, name: user.name, role: user.role } as {
-          id: string;
-          email: string;
-          name: string | null;
-          role: string;
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role as Role,
         };
       },
     }),

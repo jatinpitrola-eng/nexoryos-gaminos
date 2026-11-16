@@ -59,7 +59,7 @@ export async function POST(req: Request) {
           status: sessionId ? "OPEN" : "PAID",
         },
       });
-      const updatedItems = [];
+      const updatedItems: { id: string; stock: number }[] = [];
       for (const li of lineItems) {
         updatedItems.push(
           await tx.fnBItem.update({ where: { id: li.itemId }, data: { stock: { decrement: li.qty } } })

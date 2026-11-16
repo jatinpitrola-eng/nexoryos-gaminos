@@ -104,7 +104,7 @@ export default function BillingPage() {
   }, [invoiceId]);
 
   function minutes(r: BillRow): number {
-    if (!r.endedAt) return "—";
+    if (!r.endedAt) return 0;
     const ms = new Date(r.endedAt).getTime() - new Date(r.startedAt).getTime();
     return Math.max(1, Math.ceil(ms / 60000));
   }

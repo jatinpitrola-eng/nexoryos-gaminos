@@ -11,6 +11,7 @@ export const RULE_PRIORITY: Record<RuleKind, number> = {
 };
 
 export interface RuleLike {
+  name?: string;
   stationType: string;
   kind: string;
   ratePerHour: number;
@@ -61,5 +62,5 @@ export function resolveRateFromRules(
     return b.ratePerHour - a.ratePerHour;
   });
   const winner = matching[0];
-  return { rate: winner.ratePerHour, kind: winner.kind as RuleKind, ruleName: winner.name };
+  return { rate: winner.ratePerHour, kind: winner.kind as RuleKind, ruleName: winner.name ?? null };
 }

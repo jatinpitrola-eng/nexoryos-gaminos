@@ -34,12 +34,12 @@ export async function POST(req: Request) {
       });
       await tx.customer.update({ where: { id: customerId }, data: { walletBalance: { increment: amount } } });
 
-      let bonus = null;
-      if (bonusMinutes > 0) {
-        bonus = await tx.walletTxn.create({
-          data: { customerId, amount: bonusMinutes, type: "BONUS", note: `${bonusMinutes} bonus minutes from recharge` },
-        });
-      }
+      const bonus =
+        bonusMinutes > 0
+          ? await tx.walletTxn.create({
+              data: { customerId, amount: bonusMinutes, type: "BONUS", note: `${bonusMinutes} bonus minutes from recharge` },
+            })
+          : null;
       return { recharge, bonus };
     });
 
