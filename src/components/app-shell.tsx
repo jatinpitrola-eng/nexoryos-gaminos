@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { Brand, NexoryosBadge } from "@/components/brand";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
@@ -147,11 +147,19 @@ export function AppShell({
           <Brand size="sm" withByline={false} />
         </Link>
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon" aria-label="Open menu" className="border-violet-500/30">
-              {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
-          </SheetTrigger>
+          {/* Controlled plain button — avoids a Radix useId aria-controls hydration
+              mismatch between SSR and client on the first paint. */}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Open menu"
+            aria-expanded={open}
+            className="border-violet-500/30"
+            onClick={() => setOpen(true)}
+          >
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
           <SheetContent side="right" className="w-72 border-violet-500/20 bg-[#0c1122]/95 p-4 backdrop-blur-xl">
             <SheetTitle className="mb-4">
               <Brand size="sm" />
